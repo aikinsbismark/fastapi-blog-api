@@ -1,4 +1,4 @@
-import { authUsers, getToken } from './auth.js';
+import { authUsers, getCurrentUser, getToken } from './auth.js';
 import { CONFIG } from './config.js';
 import { getErrorMessage, showModal } from './utils.js';
 
@@ -13,7 +13,7 @@ let currentUserLikeId = null;
 export async function loadBlogDetailPage(blogId) {
     currentBlogId = blogId;
     
-    const response = await fetch(`${CONFIG.API_BASE_URL}/blog/`);
+    const response = await fetch(`${CONFIG.API_BASE_URL}/blog/${blogId}`);
     const blog = await response.json();
 
     document.getElementById('blog-content').innerHTML = `<h1>${blog.title}</h1><p>${blog.content}</p>`;
@@ -66,7 +66,7 @@ async function handleLikeAction() {
 
     try {
         if (currentUserLikeId) {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/like/delete${currentUserLikeId}`, {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/like/delete/${currentUserLikeId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -84,13 +84,14 @@ async function handleLikeAction() {
             }
         } 
         else {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/like/${currentBlogId}`, {
+            const currentUser = await getCurrentUser();
+            const response = await fetch(`${CONFIG.API_BASE_URL}/like/blog/${currentBlogId}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'text/html'
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ is_liked: true }) 
+                body: JSON.stringify({ user_id: currentUser.id }) 
             });
 
             const data = await response.json();

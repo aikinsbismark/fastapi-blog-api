@@ -111,6 +111,47 @@ a.article-title:focus {
   font-size: 1.25rem;
 }
 
+.blog-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.blog-search {
+  display: flex;
+  gap: 0.5rem;
+  min-width: min(100%, 28rem);
+}
+
+.blog-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.blog-card .article-content {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.comment-item {
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.comment-item:first-child {
+  border-top: 0;
+}
+
+.comment-children {
+  margin-top: 0.75rem;
+  margin-left: 1rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--color-border-light);
+}
+
 .article-img {
   height: var(--article-img-size);
   width: var(--article-img-size);
@@ -250,6 +291,12 @@ a.article-title:focus {
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
+  .blog-toolbar,
+  .blog-search {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .account-heading {
     font-size: 2rem;
   }
@@ -291,5 +338,24 @@ a.article-title:focus {
 /* Ensure modal header text stays white in both themes */
 .modal-header.bg-success .modal-title,
 .modal-header.bg-danger .modal-title {
-  color: #ffffff !important; 
+  color: #ffffff !important;
 }
+
+
+/* ── Password Visibility Toggle ── */
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  cursor: pointer;
+  outline: none;
+  line-height: 1;
+  color: var(--text3);
+  transition: color 0.18s ease;
+}
+
+.password-toggle:hover {
+  color: var(--purple2);
+}
+
