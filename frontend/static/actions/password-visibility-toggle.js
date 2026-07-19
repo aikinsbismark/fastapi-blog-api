@@ -1,5 +1,5 @@
 export function initPasswordToggle() {
-  const fields = [
+  const passwordFields = [
     'password',
     'currentPassword',
     'newPassword',
@@ -7,7 +7,7 @@ export function initPasswordToggle() {
     'confirmNewPassword',
   ];
 
-  fields.forEach(id => {
+  passworFields.forEach(id => {
     const passwordInput = document.getElementById(id);
     if (passwordInput) {
         createToggleButton(passwordInput);
@@ -16,19 +16,43 @@ export function initPasswordToggle() {
 }
 
 function createToggleButton(inputField) {
-    const toggleButton = document.createElement('span');
-    toggleButton.innerHTML = '<i class="fas fa-eye"></i>';
-    toggleButton.classList.add('password-toggle');
+    if (inputField.parentElement?.classList.contains("password-input-wrapper")) {
+        return;
+    }
 
-    inputField.parentNode.insertBefore(toggleButton, inputField.nextSibling);
+    const wrapper = document.createElement("div");
+    wrapper.className = "password-input-wrapper";
 
-    toggleButton.addEventListener('click', function() {
-        if (inputField.type === 'password') {
-            inputField.type = 'text';
-            toggleButton.innerHTML = '<i class="fas fa-eye-slash"></i>';
-        } else {
-            inputField.type = 'password';
-            toggleButton.innerHTML = '<i class="fas fa-eye"></i>';
-        }
-    })
+    inputField.parentNode.insertBefore(wrapper, inputField);
+    wrapper.appendChild(inputField);
+
+    const toggleButton = document.createElement("button");
+    toggleButton.type = "button";
+    toggleButton.className = "password-toggle";
+    toggleButton.setAttribute("aria-label", "Show password");
+    toggleButton.setAttribute("aria-pressed", "false");
+    toggleButton.innerHTML =
+        '<i class="fas fa-eye" aria-hidden="true"></i>';
+
+    wrapper.appendChild(toggleButton);
+
+    toggleButton.addEventListener("click", () => {
+        const passwordHidden = inputField.type === "password";
+
+        inputField.type = passwordHidden ? "text" : "password";
+
+        toggleButton.innerHTML = passwordHidden
+            ? '<i class="fas fa-eye-slash" aria-hidden="true"></i>'
+            : '<i class="fas fa-eye" aria-hidden="true"></i>';
+
+        toggleButton.setAttribute(
+            "aria-label",
+            passwordHidden ? "Hide password" : "Show password"
+        );
+
+        toggleButton.setAttribute(
+            "aria-pressed",
+            String(passwordHidden)
+        );
+    });
 }
