@@ -62,7 +62,7 @@ export const getCurrentAuthor = async (token) => {
     }
 
     try {
-        const response = await fetch(`${config.API_BASE_URL}/blog/author/me`, {
+        const response = await fetch(`${config.API_BASE_URL}/author/me`, {
             headers: {
                 Authorization: `Bearer ${token}`
             }
