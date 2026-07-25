@@ -123,6 +123,7 @@ class UserReadBlog(BaseModel):
     title: str
     content: str
     author: AuthorBase
+    likes_count: int = 0
 
 
 class BlogInfoSchema(BaseModel):
