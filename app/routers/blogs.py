@@ -36,8 +36,8 @@ async def create_blog(blog: BlogCreate,
     return new_blog
 
 
-@router.put("/{blog_id}/submit", status_code=status.HTTP_202_ACCEPTED)
-async def submit_blog(blog_id: int,
+@router.put("/{blog_id}/publish", status_code=status.HTTP_202_ACCEPTED)
+async def publish_blog(blog_id: int,
                       current_admin = Depends(get_current_active_admin),
                       db: Session = Depends(get_db)):
     blog = db.execute(select(Blog).where(Blog.id == blog_id)).scalars().first()
@@ -81,10 +81,23 @@ async def get_blogs(
     )
     blogs = result.scalars().all()
 
+    blog_entries = []
+    for blog in blogs:
+        likes_count = db.execute(select(func.count()).select_from(Like).where(Like.blog_id == blog.id)).scalar() or 0
+        blog_entries.append(
+            UserReadBlog.model_validate({
+                'id': blog.id,
+                'title': blog.title,
+                'content': blog.content,
+                'author': blog.author,
+                'likes_count': likes_count,
+            })
+        )
+
     has_more = skip + len(blogs) < total
 
     return PaginatedBlogsResponse(
-        blogs=[UserReadBlog.model_validate(blog) for blog in blogs],
+        blogs=blog_entries,
         total=total,
         skip=skip,
         limit=limit,
@@ -141,7 +154,7 @@ async def get_current_admin_or_author(db: Session = Depends(get_db), token: str 
 
 
 @router.get("/pending", response_model=List[UserReadBlog])
-async def read_pending_blogs(current = Depends(get_current_admin_or_author), db: Session = Depends(get_db)):
+async def load_pending_blogs(current = Depends(get_current_admin_or_author), db: Session = Depends(get_db)):
     if current.get("role") == "admin":
         return db.query(Blog).filter(Blog.status == BlogStatus.PENDING).all()
     else:
