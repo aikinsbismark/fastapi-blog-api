@@ -59,16 +59,17 @@ async def list_users(db: Session = Depends(get_db)):
 
 @admin_router.delete("/users/{user_id}")
 async def delete_user(user_id: int, current_admin = Depends(get_current_active_admin), db: Session = Depends(get_db)):
-    if user_id != current_admin.id:
+    if user_id == current_admin.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this user"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own account"
         )
     user = db.execute(select(UserModel).where(UserModel.id == user_id)).scalars().first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
-            detail="User not found")
+            detail="User not found"
+        )
     db.delete(user)
     db.commit()
     return {"message": "User deleted"}
