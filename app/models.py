@@ -31,7 +31,7 @@ class Author(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    admin_user_id: Mapped[int] = mapped_column(ForeignKey("admin_user.id"))
+    admin_user_id: Mapped[int | None] = mapped_column(ForeignKey("admin_user.id"), nullable=True)
     admin_user: Mapped["AdminUser"] = relationship(back_populates="author")
     blog: Mapped[List["Blog"]] = relationship(back_populates="author")
 
@@ -65,7 +65,7 @@ class Blog(Base):
     readers: Mapped[List["UserReadsBlogs"]] = relationship(
         back_populates="blog"
     )
-    status: Mapped[BlogStatus] = mapped_column(Enum(BlogStatus), server_default="PENDING")
+    status: Mapped[BlogStatus] = mapped_column(Enum(BlogStatus, name="blog_status"), default=BlogStatus.PENDING)
 
 
 class UserReadsBlogs(Base):
@@ -94,6 +94,13 @@ class Comment(Base):
     user: Mapped["UserModel"] = relationship(back_populates="comment")
     blog_id: Mapped[int] = mapped_column(ForeignKey("blogs.id"))
     blog: Mapped["Blog"] = relationship(back_populates="comment")
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id"), nullable=True)
+    parent: Mapped["Comment | None"] = relationship(
+        "Comment",
+        remote_side=[id],
+        back_populates="children",
+    )
+    children: Mapped[List["Comment"]] = relationship(back_populates="parent", cascade="all, delete")
 
 
 class Like(Base):
