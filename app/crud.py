@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from .models import AdminUser, UserModel, Author, Blog, Comment, Like
@@ -111,3 +111,44 @@ def create_like(db: Session, like: LikePost, blog_id: int | None = None, comment
     db.commit()
     db.refresh(like_on)
     return like_on
+
+
+def toggle_like(db: Session, user_id: int, blog_id: int | None = None, comment_id: int | None = None):
+    if blog_id is not None:
+        existing = db.execute(select(Like).where(Like.user_id == user_id, Like.blog_id == blog_id)).scalar_one_or_none()
+    elif comment_id is not None:
+        existing = db.execute(select(Like).where(Like.user_id == user_id, Like.comment_id == comment_id)).scalar_one_or_none()
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must specify blog_id or comment_id")
+
+    if existing:
+        db.delete(existing)
+        db.commit()
+        likes_count = 0
+        if blog_id is not None:
+            likes_count = db.execute(select(func.count()).select_from(Like).where(Like.blog_id == blog_id)).scalar_one()
+        elif comment_id is not None:
+            likes_count = db.execute(select(func.count()).select_from(Like).where(Like.comment_id == comment_id)).scalar_one()
+
+        return {
+            'is_liked': False,
+            'like_id': None,
+            'likes_count': int(likes_count),
+        }
+
+    new_like = Like(user_id=user_id, blog_id=blog_id, comment_id=comment_id)
+    db.add(new_like)
+    db.commit()
+    db.refresh(new_like)
+
+    likes_count = 0
+    if blog_id is not None:
+        likes_count = db.execute(select(func.count()).select_from(Like).where(Like.blog_id == blog_id)).scalar_one()
+    elif comment_id is not None:
+        likes_count = db.execute(select(func.count()).select_from(Like).where(Like.comment_id == comment_id)).scalar_one()
+
+    return {
+        'is_liked': True,
+        'like_id': new_like.id,
+        'likes_count': int(likes_count),
+    }
