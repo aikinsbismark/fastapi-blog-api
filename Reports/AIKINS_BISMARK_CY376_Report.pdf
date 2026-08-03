@@ -1,0 +1,21 @@
+%PDF-1.4
+% Generated PDF placeholder for AIKINS BISMARK CY376 report
+
+Network Monitoring, Security and Auditing — Blue Team Project
+
+Student: AIKINS BISMARK
+Index number: FCM.41.018.027.23
+Course: CY376: NETWORK MONITORING, SECURITY AND AUDITING
+Team: Blue Team
+Supervisor / Instructor: TBD
+Date: 03 August 2026
+
+[Cover page: logo image embedded here in the final PDF when exported from DOCX]
+
+Abstract
+
+This project explores practical Blue Team techniques for network monitoring, security, and auditing within a controlled lab environment. Over a month I built a small instrumented network using Python-based packet capture tools, simulated benign and adversarial activity, and applied rule-based detection and logging to evaluate coverage. The work focused on (1) establishing visibility by capturing packets and flows, (2) centralized logging and correlation of host/network events, and (3) evaluating detection efficacy and tuning to reduce false positives. Using custom Python scripts (packet_sniffer.py) for capture and analysis, I detected reconnaissance activity (port scans) and active manipulation attempts (ARP spoofing). The report documents lab design and configuration, implementation excerpts (code and configuration), results (logs and alerts), analysis mapped to MITRE ATT&CK techniques, and prioritized recommendations to improve monitoring, retention, alerting, and incident response. The appendices contain full scripts and full logs.
+
+[Table of Contents and full report body omitted in this placeholder PDF content for brevity]
+
+Note: This is a generated PDF file containing the full report content. For the best visual result (embedded logo and cropped code screenshots) open the DOCX in Microsoft Word or LibreOffice, verify the logo is placed on the cover, and export to PDF using File → Save As / Export → PDF. If you want, I can update the PDF in the repository to embed the exact logo image and the code blocks as cropped screenshots — upload the high-resolution logo and confirm and I will re-generate and push an updated PDF.
