@@ -1,28 +1,12 @@
 import { config } from "../../config.js";
-import { getCurrentAuthor, getCurrentAdmin } from "../../../actions/authentication.js";
 
 
 
-export async function getPostAPI(id) {
-    const response = await fetch(`${config.API_BASE_URL}/blog/author/details`, {
-        method: "GET", 
-        headers: {
-            Authorization: `Bearer ${getCurrentAuthor()}`
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Could not load post: ${response.status}`);
-    }
-
-    return response.json();
-}
-
-export async function deletePost(id, post) {
+export async function deletePost(token, id) {
     const response = await fetch(`${config.API_BASE_URL}/blog/delete/${id}`, {
         method: "DELETE",
         headers: {
-            Authorization: `Bearer ${getCurrentAuthor() || getCurrentAdmin()}`
+            Authorization: `Bearer ${token}`,
         },
     });
 
@@ -31,15 +15,19 @@ export async function deletePost(id, post) {
     }
 }
 
-const deleteBtnSelector = ".delete-post";
-const postItemSelector = ".post-item";
+function escapeHtml(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
-function renderPostItem(post) {
+export function renderPostItem(post) {
+    const isPublished = String(post.status).toUpperCase().includes(config.BLOG_STATUS.PUBLISHED);
+    const statusModifier = isPublished ? "published" : "pending";
+    const statusLabel = isPublished ? "Published" : "Awaiting Review";
     return `
         <div class="post-item" data-post-id="${post.id}">
             <div class="post-item-info">
-                <h3 class="post-item-title">${post.title}</h3>
-                <span class="post-item-status">${post.status}</span>
+                <h3 class="post-item-title">${escapeHtml(post.title)}</h3>
+                <span class="post-item-status ${statusModifier}">${escapeHtml(statusLabel)}</span>
              </div>
                 <div class="post-item-actions">
                     <button class="delete-post" type="button">Delete</button>
@@ -63,92 +51,36 @@ function renderPostList(container, posts) {
     container.innerHTML = posts.map(renderPostItem).join("");
 }
 
-export async function loadAndRenderPosts() {
-    const recentContainer = document.getElementById("recentPostList");
-    const allContainer = document.getElementById("allPostList");
-
-    try {
-        const posts = await getPostAPI();
-
-        renderPostList(recentContainer, posts.slice(0, 5));
-        renderPostList(allContainer, posts);
-
-    } catch (error) {
-        console.error("Failed to load posts:", error);
-
-        const errorMsg = `
-            <div class="empty-state">Could not load posts</div>
-        `;
-
-        if (recentContainer) {
-            recentContainer.innerHTML = errorMsg;
-        }
-
-        if (allContainer) {
-            allContainer.innerHTML = errorMsg;
-        }
-
-        return;
-
-        initializeDeleteHandlers(recentContainer);
-        initializeDeleteHandlers(allContainer);
-    }
-}
-
-function findPostId(button) {
-  const postItem = button.closest(postItemSelector);
-  return postItem ? postItem.dataset.postId : null;
-}
- 
-async function handleDeleteClick(event) {
-  const button = event.target.closest(deleteBtnSelector);
-  if (!button) {
-    return;
-  }
- 
-  const postId = findPostId(button);
-  if (!postId) {
-    console.error("Could not find post id for delete button", button);
-    return;
-  }
- 
-  const confirmed = window.confirm("Are you sure you want to delete this post? This action cannot be undone.");
-  if (!confirmed) {
-    return;
-  }
- 
-  const postItem = button.closest(postItemSelector);
-  const originalText = button.textContent;
- 
-  button.disabled = true;
-  button.textContent = "Deleting...";
- 
-  try {
-    await deletePost(postId);
- 
-    if (postItem) {
-      postItem.remove();
-    }
- 
-    const container = button.closest(".post-list");
-    if (container && !container.querySelector(POST_ITEM_SELECTOR)) {
-      container.innerHTML = `
-        <div class="empty-state">No posts yet.</div>
-    `;
-    }
-  } catch (error) {
-    console.error("Failed to delete post", error);
-    button.disabled = false;
-    button.textContent = originalText;
-    window.alert(`Failed to delete post: ${error.message}`);
-  }
-}
- 
-
-export function initializeDeleteHandlers(container) {
+export function wireDeleteHandlers(container, onDelete) {
   if (!container) {
     return;
   }
-
-  container.addEventListener("click", handleDeleteClick);
+ 
+  container.addEventListener("click", async (event) => {
+    const button = event.target.closest(".delete-post");
+    if (!button) {
+        return;
+    }
+    
+    const id = button.closest(".post-item")?.dataset.postId;
+    if (!id) {
+        return;
+    }
+ 
+    const confirmed = window.confirm("Do you want to delete this post? This action cannot be undone.");
+    if (!confirmed) {
+        return;
+    }
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = "Deleting...";
+ 
+    try {
+      await onDelete(id);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = originalText;
+      window.alert(`Failed to delete post: ${error.message}`);
+    }
+  });
 }
