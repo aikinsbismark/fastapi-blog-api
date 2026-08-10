@@ -1,12 +1,38 @@
 import { config } from "../../config.js";
-import { getCurrentAuthor } from "../../../actions/authentication.js";
+import { isAuthenticated, getCurrentAuthor, removeLocalStorage } from "../../../actions/authentication.js";
 
 
-export async function getPostAPI() {
+
+const maxTitleLength = 60;
+
+function extractToken(storedUser) {
+    return storedUser?.access_token ?? storedUser?.token ?? storedUser?.jwt ?? null;
+}
+
+export async function getAuthorSession() {
+    const storedUser = isAuthenticated();
+    if (!storedUser) {
+        window.location.href = "/login.html";
+        return null;
+    }
+    const token = extractToken(storedUser);
+    const author = await getCurrentAuthor(token);
+    
+    if (!author) {
+        removeLocalStorage("user");
+        window.location.href = "/login.html";
+        return null;
+    }
+
+    return { token, author };
+}
+
+
+export async function getAuthorPostAPI() {
     const response = await fetch(`${config.API_BASE_URL}/blog/author/details`, {
         method: "GET",
         headers: {
-            Athorization: `Bearer ${getCurrentAuthor()}`,
+            Authorization: `Bearer ${token}`,
         },
     });
 
@@ -17,12 +43,12 @@ export async function getPostAPI() {
     return response.json();
 }
 
-export async function updatePost(id, post) {
+export async function updatePost(token, id, post) {
     const response = await fetch(`${config.API_BASE_URL}/blog/update/${id}`, {
         method: "PUT", 
         headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${getCurrentAuthor()}`,
+            Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(post),
     });
@@ -34,7 +60,7 @@ export async function updatePost(id, post) {
     return response.json();
 }
 
-export async function createPost(id, title, content) {
+export async function createPost(title, content) {
     const writeTitle = title.trim();
     const writeContent = content.trim();
 
@@ -42,35 +68,52 @@ export async function createPost(id, title, content) {
         throw new Error("Title and content are required.");
     }
 
-    if (writeTitle.length > 60) {
-        throw new Error("Title should be 60 characters or fewer.");
+    if (writeTitle.length > maxTitleLength) {
+        throw new Error(`Title should be ${maxTitleLength} characters or fewer.`);
     }
 
-    return updatePost(id, { title: writeTitle, content: writeContent });
+    return {title: writeTitle, content: writeContent};
 }
 
 const form = document.getElementById("postForm");
+const titleField = document.getElementById("postTitle");
+const contentField = document.getElementById("postContent");
 const errorElement = document.getElementById("formError");
 const successElement = document.getElementById("formSuccess");
 const submitBtn = document.getElementById("submitBtn");
 
 
-const params = new URLSearchParams(window.location.search);
-const postId = params.get("id");
+const postId = new URLSearchParams(window.location.search).get("id");
+
+function showLoadError(message) {
+  errorElement.textContent = message;
+  form.hidden = true;
+}
 
 if (!postId) {
   errorElement.textContent = "No post ID provided.";
 }
 
-async function loadPost() {
-  if (!postId) return;
+async function loadPost(token) {
+  if (!postId) {
+    showLoadError("No post ID provided.");
+    return;
+  }
 
   try {
-    const post = await getPostAPI(postId);
-    document.getElementById("postTitle").value = post.title || "";
-    document.getElementById("postContent").value = post.content || "";
+    const posts = await getAuthorPostAPI(token);
+    const matchedPost = posts.find(post => String(post.id) === String(postId));
+
+    if (!matchedPost) {
+      showLoadError("Could not find the post.");
+      return;
+    }
+
+    titleField.value = matchedPost.title ?? "";
+    contentField.value = matchedPost.content ?? "";
   } catch (error) {
-    errorElement.textContent = "Error:", error;
+    showLoadError("Failed to load the post. Please try again later.");
+    console.error("Error loading post:", error);
   }
 }
 
@@ -82,10 +125,8 @@ form.addEventListener("submit", async (event) => {
     submitBtn.textContent = "Saving...";
 
     try {
-        await updatePost(
-            document.getElementById("PostTitle").value,
-            document.getElementById("postContent").value
-        );
+        const buildValidatedPost = await createPost(titleField.value, contentField.value);
+        await updatePost(token, postId, buildValidatedPost);
 
         successElement.textContent = "Post updated successfully."
     } catch (error) {
@@ -96,4 +137,18 @@ form.addEventListener("submit", async (event) => {
     }
 });
 
-loadPost();
+async function initializeEditBlog() {
+    const session = await getAuthorSession();
+    
+    if (!session) {
+        return;
+    }
+
+    if (pageWrapper) {
+        pageWrapper.hidden = false;
+    }
+
+    await loadPost(session);
+}
+
+return initializeEditBlog();
