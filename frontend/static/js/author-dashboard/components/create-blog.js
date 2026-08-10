@@ -1,14 +1,12 @@
 import { config } from "../../config.js";
-import { getCurrentAuthor } from "../../../actions/authentication.js";
 
 
-
-export async function createPostAPI(post) {
+async function createPostAPI(token, post) {
     const response = await fetch(`${config.API_BASE_URL}/blog/create`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${getCurrentAuthor()}`,
+            Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(post),
     });
@@ -40,17 +38,18 @@ const errorElement = document.getElementById("formError");
 const successElement = document.getElementById("formSuccess");
 const submitBtn = document.getElementById("submitBtn");
 
-form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    errorElement.textContent = "";
-    successElement.textContent = "";
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Submitting..."
+if (form) {
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        errorElement.textContent = "";
+        successElement.textContent = "";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Submitting..."
 
     try {
         await createPost(
-            document.getElementById("PostTitle").value,
-            document.getElementById("PostContent").value
+            document.getElementById("postTitle").value,
+            document.getElementById("postContent").value
         );
 
         successElement.textContent = "Sent to the admin for review.";
@@ -62,3 +61,4 @@ form.addEventListener("submit", async (event) => {
         submitBtn.textContent = "Submit for review"
     }
 });
+}
