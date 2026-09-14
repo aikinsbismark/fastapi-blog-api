@@ -1,44 +1,17 @@
-import { config } from "../../config.js";
+import { getAuthorSession, api, validatePost } from "./author-session.js";
 
+export async function initCreatePage() {
+    const form = document.getElementById("postForm");
+    const errorElement = document.getElementById("formError");
+    const successElement = document.getElementById("formSuccess");
+    const submitBtn = document.getElementById("submitBtn");
 
-async function createPostAPI(token, post) {
-    const response = await fetch(`${config.API_BASE_URL}/blog/create`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(post),
-    });
+    const session = await getAuthorSession();
 
-    if (!response.ok) {
-        throw new Error(`Response status: ${response.status}`);
+    if (!session) {
+        return;
     }
 
-    return response.json();
-}
-
-export async function createPost(title, content) {
-    const writeTitle = title.trim();
-    const writeContent = content.trim();
-
-    if (!writeTitle || !writeContent) {
-        throw new Error("Title and content are required.");
-    }
-
-    if (writeTitle.length > 60) {
-        throw new Error("Title should be 60 characters or fewer.");
-    }
-
-    return createPostAPI({ title: writeTitle, content: writeContent });
-}
-
-const form = document.getElementById("postForm");
-const errorElement = document.getElementById("formError");
-const successElement = document.getElementById("formSuccess");
-const submitBtn = document.getElementById("submitBtn");
-
-if (form) {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
         errorElement.textContent = "";
@@ -47,11 +20,11 @@ if (form) {
         submitBtn.textContent = "Submitting..."
 
     try {
-        await createPost(
+        const validated = validatePost(
             document.getElementById("postTitle").value,
             document.getElementById("postContent").value
-        );
-
+        )
+        await api.createPost(session.token, validated);
         successElement.textContent = "Sent to the admin for review.";
         form.reset();
     } catch (error) {
@@ -61,4 +34,4 @@ if (form) {
         submitBtn.textContent = "Submit for review"
     }
 });
-}
+}    
