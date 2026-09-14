@@ -1,23 +1,7 @@
 import { config } from "../../config.js";
+import { escapeHtml } from "./author-session.js"
 
 
-
-export async function deletePost(token, id) {
-    const response = await fetch(`${config.API_BASE_URL}/blog/delete/${id}`, {
-        method: "DELETE",
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to delete post: ${response.status}`);
-    }
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 
 export function renderPostItem(post) {
     const isPublished = String(post.status).toUpperCase().includes(config.BLOG_STATUS.PUBLISHED);
