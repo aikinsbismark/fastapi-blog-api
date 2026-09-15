@@ -5,6 +5,7 @@ import { initPasswordToggle } from '../actions/password-visibility-toggle.js';
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
 const loginForm = document.getElementById('loginForm');
+const submitButton = document.querySelector('button[type="submit"]');
 
 
 initPasswordToggle();
@@ -14,14 +15,25 @@ if (currentUser) {
     redirectByRole(currentUser.role);
 }
 
+function clearValidity() {
+    usernameInput.setCustomValidity('');
+    passwordInput.setCustomValidity('');
+}
 
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
+usernameInput.addEventListener('input', clearValidity);
+passwordInput.addEventListener('input', clearValidity);
+
+
+loginForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    clearValidity();
 
     const formData = new FormData(loginForm);
     const username = formData.get('username').trim();
-    const password = formData.get('password').trim();
+    const password = formData.get('password');
     const role = formData.get('role') || 'user';
+
+    submitButton.disabled = true;
 
     try {
         const data = await login({ username, password }, role);
@@ -30,27 +42,30 @@ loginForm.addEventListener('submit', async (e) => {
             const msg = data?.detail || 'Incorrect username or password.';
             usernameInput.setCustomValidity(msg);
             passwordInput.setCustomValidity(msg);
-
             passwordInput.reportValidity();
             return;
         }
 
-        setToken(data.access_token);
-        const user = await getCurrentUser();
         authenticate(
-            { user: { ...user, token: data.access_token } },
-            () => {
-                redirectByRole(user?.role);
+            { user: { 
+                ...data.user, 
+                role: data.user.role ?? role,
+                token: data.access_token
+             } ,
+            },
+            (user) => {
+                redirectByRole(user?.role ?? role);
             }
         );
     } catch (error) {
         const msg =
-        getErrorMessage(error) || 'Network error. Please check your connection and try again.';
+        error?.message || 'Network error. Please check your connection and try again.';
         usernameInput.setCustomValidity(msg);
         passwordInput.setCustomValidity(msg);
-
         passwordInput.reportValidity();
         console.error('Login error:', error);
+    } finally {
+        submitButton.disabled = false;
     }
 });
 
