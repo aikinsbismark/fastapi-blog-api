@@ -2,7 +2,7 @@
 <html lang="en-US">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, intitial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>FastAPI Blog</title>  
 
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,10 +12,10 @@
     </head>
 <body>
     <section class="comments" id="comment-root">
-        <div class="comments-heade">
+        <div class="comments-header">
             <h2 class="comments-title">Comments</h2>
         </div>
-        <div class="comment-list" id="classList">
+        <div class="comment-list" id="commentList">
             <div class="comment-list-loading">Loading comments...</div>
         </div>
         <div class="composer" id="composer">
@@ -24,22 +24,22 @@
                 <textarea
                     id="composerInput"
                     class="composer-input"
-                    placeholder="Add a comment for"
+                    placeholder="Add a comment..."
                     rows="1"
                     maxlength="2000">
                 </textarea>
-                <button class="send-btn" id="sendBtn" type="button">&#8593
+                <button class="send-btn" id="sendBtn" type="button">&#8593;
                 </button>
             </div>
         </div> 
 
         <div class="composer-locked hidden" id="composerLocked">
-            <p><a href="./login.html">Log in</a> to join the conversation.</p>
+            <p><a href="./login.html">Log in</a></p>
         </div>
 
     </section>
-    <div class="toast" id="tost"></div>
+    <div class="toast" id="toast"></div>
     
-    <script type="module" src=""></script>
+    <script type="module" src="../js/comment.js"></script>
 </body>
 </html>
