@@ -7,7 +7,7 @@ export function initPasswordToggle() {
     'confirmNewPassword',
   ];
 
-  passworFields.forEach(id => {
+  passwordFields.forEach(id => {
     const passwordInput = document.getElementById(id);
     if (passwordInput) {
         createToggleButton(passwordInput);
