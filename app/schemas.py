@@ -64,6 +64,7 @@ class AuthorBase(BaseModel):
     id: int
     username: str
     email_address: EmailStr
+    disabled: bool | None = None
     
 
 class AuthorCreate(BaseModel):
