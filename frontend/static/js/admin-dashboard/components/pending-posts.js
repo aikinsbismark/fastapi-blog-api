@@ -1,21 +1,18 @@
-import { config } from "../../config";
-import { isAuthenticated } from "../../../actions/authentication.js";
-import { publishBlog } from "./published-posts.js";
+import { config } from "../../config.js";
 
 
 let pendingBlogs = [];
 let token = null;
 
+export function setPendingToken(sessionToken) {
+    token = sessionToken;
+}
 
 export async function initializePendingPosts() {
-    const session = isAuthenticated();
+    return loadPendingBlogs();
+}
 
-    if (!session) {
-        return;
-    }
-    
-    token = session.access_token || session.token;
-
+export async function loadPendingBlogs() {
     const response = await fetch (`${config.API_BASE_URL}/blog/pending`, {
         headers: {
             Authorization: `Bearer ${token}`
@@ -30,16 +27,17 @@ export async function initializePendingPosts() {
 
     renderRecentPending();
     renderAllPending();
+    return pendingBlogs;
 }
 
-export function renderRecentPending() {
+export function renderRecentPending(posts = pendingBlogs) {
     const container = document.getElementById('recentPendingList');
 
     if (!container) {
         return;
     }
 
-    if (!pendingBlogs.length) {
+    if (!posts.length) {
         container.innerHTML = `
             <div class="empty-state">
                 No pending blogs.
@@ -48,12 +46,21 @@ export function renderRecentPending() {
         return;
     }
 
-    container.innerHTML = pendingBlogs.slice(0, 3).map(createPendingCard).join("");
-    attachPublishEvents(container);
+    container.innerHTML = posts.slice(0, 3).map(createPendingCard).join("");
+    attachPendingActions(container);
+}
+
+export function renderAllPending(posts = pendingBlogs) {
+    const container = document.getElementById("allPendingList");
+    if (!container) return;
+    container.innerHTML = posts.length
+        ? posts.map(createPendingCard).join("")
+        : '<div class="empty-state">No pending blogs.</div>';
+    attachPendingActions(container);
 }
 
 export function createPendingCard(blog) {
-    const authorName = post.author?.username ?? 'Unknown author';
+    const authorName = blog.author?.username ?? 'Unknown author';
 
     return `
         <div class="pending-row" data-id="${blog.id}">
@@ -71,40 +78,39 @@ export function createPendingCard(blog) {
                 <button
                     class="btn-success"
                     data-action="approve"
-                    data-id="${post.id}"
+                    data-id="${blog.id}"
                 >
                     <i data-icon="check"></i>
                     Publish
                 </button>
 
-                <button
-                    class="btn-danger"
-                    data-action="reject"
-                    data-id="${post.id}"
-                >
-                    <i data-icon="x"></i>
-                    Reject
-                </button>
             </div>
         </div>
     `;
 }
 
 function attachPendingActions(container) {
-    const buttons = container.querySelectorAll(".publish-button");
+    const buttons = container.querySelectorAll('[data-action="approve"]');
 
     buttons.forEach(button => {
         button.addEventListener("click", async () => {
-            const blogId = Number(button.dataset.blogId);
+            const blogId = Number(button.dataset.id);
 
             button.disabled = true;
 
             button.textContent = "Publishing...";
 
             try {
-                await publishBlog(blogId);
+                const response = await fetch(`${config.API_BASE_URL}/blog/${blogId}/publish`, {
+                    method: "PUT",
+                    headers: { Authorization: `Bearer ${token}` },
+                });
 
-                await pendingBlogs();
+                if (!response.ok) {
+                    throw new Error(`Response status: ${response.status}`);
+                }
+
+                await loadPendingBlogs();
             } catch (error) {
                 console.error(error);
 
@@ -113,4 +119,11 @@ function attachPendingActions(container) {
             }
         });
     });
+}
+
+function escapeHtml(value = "") {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 }
