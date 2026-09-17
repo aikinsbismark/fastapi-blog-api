@@ -34,6 +34,7 @@ class Author(Base):
     admin_user_id: Mapped[int | None] = mapped_column(ForeignKey("admin_user.id"), nullable=True)
     admin_user: Mapped["AdminUser"] = relationship(back_populates="author")
     blog: Mapped[List["Blog"]] = relationship(back_populates="author")
+    disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
 
 
 class UserModel(Base):
@@ -42,6 +43,7 @@ class UserModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
     like: Mapped[List["Like"]] = relationship(back_populates="user")
     comment: Mapped[List["Comment"]] = relationship(back_populates="user")
     reads: Mapped[List["UserReadsBlogs"]] = relationship(
