@@ -1,7 +1,7 @@
 import { config } from "../../config.js";
 import { isAuthenticated, getCurrentAdmin } from "../../../actions/authentication.js";
-import { loadUsers } from "./users.js";
-import { loadPendingBlogs, createPendingCard, renderRecentPending } from "./pending-posts.js";
+import { initializeRoleFilter, loadUsers, setUsersToken } from "./users.js";
+import { loadPendingBlogs, renderRecentPending, setPendingToken } from "./pending-posts.js";
 
 
 let currentAdmin = null;
@@ -15,7 +15,7 @@ export async function initializeDashboard() {
         return;
     }
 
-    token = sesison.access_token || session.token;
+    token = session.access_token || session.token;
 
     currentAdmin = await getCurrentAdmin(token);
 
@@ -24,21 +24,23 @@ export async function initializeDashboard() {
         return;
     }
 
-    showDashBoard();
-    await loadDashBoard();
+    setUsersToken(token);
+    setPendingToken(token);
+    initializeRoleFilter();
+    showDashboard();
+    await loadDashboard();
 }
 
 async function loadDashboard() {
     try {
-        await Promise.all([loadUsers(), loadPendingBlogs()]);
+        const [users, pendingBlogs] = await Promise.all([loadUsers(), loadPendingBlogs()]);
 
         updateWelcomeMessage();
-        updateStatistics();
-        renderRecentPending();
+        updateStatistics(users, pendingBlogs);
+        renderRecentPending(pendingBlogs);
 
     } catch (error) {
         console.error("Dashboard failed to load:", error);
-        showToast("Something went wrong loading the dashboard. Please refresh.", error);
     }
 }
 
@@ -51,19 +53,17 @@ function updateWelcomeMessage() {
     document.getElementById("welcomeName").textContent = currentAdmin.username;
 }
 
-function updateStatistics() {
-    const adminCount = allUsers.filter(user =>
+function updateStatistics(users, pendingBlogs) {
+    const adminCount = users.filter(user =>
         user.role === "admin"
     ).length;
 
-    const renderCount = allUsers.filter (user =>
+    const readerCount = users.filter(user =>
         user.role === "user"
     ).length;
 
-    document.getElementById("statTotalUsers").textContent = loadUsers.length;
-    document.getElementById("statPendingPosts").textContent = createPendingCard.length;
+    document.getElementById("statTotalUsers").textContent = users.length;
+    document.getElementById("statPendingPosts").textContent = pendingBlogs.length;
     document.getElementById("statAdmins").textContent = adminCount;
     document.getElementById("statRegularUsers").textContent = readerCount;
 }
-
-renderRecentPending();
