@@ -36,9 +36,10 @@ loginForm.addEventListener('submit', async (event) => {
     submitButton.disabled = true;
 
     try {
-        const data = await login({ username, password }, role);
+        const result = await login({ username, password }, role);
+        const data = result?.data;
 
-        if (!data || data.detail || !data.access_token) {
+        if (!result?.ok || !data?.access_token) {
             const msg = data?.detail || 'Incorrect username or password.';
             usernameInput.setCustomValidity(msg);
             passwordInput.setCustomValidity(msg);
@@ -48,8 +49,8 @@ loginForm.addEventListener('submit', async (event) => {
 
         authenticate(
             { user: { 
-                ...data.user, 
-                role: data.user.role ?? role,
+                ...(data.user || {}),
+                role: data.user?.role ?? role,
                 token: data.access_token
              } ,
             },
