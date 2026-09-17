@@ -45,15 +45,27 @@ export const login = async (user, role) => {
     body.append('username', user.username);
     body.append('password', user.password);
 
-    return fetch(url, {
+    const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: body.toString()
-    })
-        .then(response => response.json())
-        .catch(error => console.log(error));
+    });
+
+    let data = {}
+
+    try {
+        data = await response.json();
+    } catch (error) {
+        console.error("Unable to parse response.");
+    }
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        data,
+    };
 };
 
 export const getCurrentAuthor = async (token) => {
@@ -108,7 +120,7 @@ export const getCurrentAdmin = async (token) => {
     }
 };
 
-export const getCurrenUser = async (token) => {
+export const getCurrentUser = async (token) => {
     if (!token) {
         return null;
     }
