@@ -1,8 +1,35 @@
-import { getErrorMessage, showModal } from './utils.js';
 import { signup } from '../actions/authentication.js';
 import { initPasswordToggle } from '../actions/password-visibility-toggle.js';
 
+
+
 initPasswordToggle();
+
+
+function getErrorMessage(error) {
+    if (!error) {
+        return 'Something went wrong. Please try again.';
+    }
+
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    if (Array.isArray(error.detail)) {
+        return error.detail.map(item => item.msg).filter(Boolean).join(' ');
+    }
+
+    if (typeof error.detail === 'string') {
+        return error.detail;
+    }
+
+    if (typeof error.message === 'string') {
+        return error.message;
+    }
+
+    return 'Something went wrong. Please try again.';
+}
+
 
 const registerForm = document.getElementById('registerForm');
 const usernameInput = document.getElementById('username');
@@ -17,21 +44,28 @@ if (registerForm && confirmPasswordInput && passwordInput) {
         input.addEventListener('input', () => {
             input.setCustomValidity('');
         });
-    }); 
+    });
 
-    confirmPasswordInput.addEventListener('input', () => {
+    function checkPasswordsMatch() {
         if (passwordInput.value !== confirmPasswordInput.value) {
+            confirmPasswordInput.classList.add('is-invalid');
             passwordError.classList.remove('d-none');
             confirmPasswordInput.setCustomValidity('Passwords do not match');
-    }   else {
+        } else {
+            confirmPasswordInput.classList.remove('is-invalid');
             passwordError.classList.add('d-none');
             confirmPasswordInput.setCustomValidity('');
         }
-});
+    }
 
-registerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
+    [passwordInput, confirmPasswordInput].forEach(input => {
+        input.addEventListener('input', checkPasswordsMatch);
+    });
+
+
+registerForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
     if (passwordInput.value !== confirmPasswordInput.value) {
         passwordError.classList.remove('d-none');
         return;
@@ -52,7 +86,7 @@ registerForm.addEventListener('submit', async (e) => {
         if (response.ok) {
             document.getElementById('successMessage').textContent =
                 'Account created successfully! Please login.';
-            
+
             setTimeout(() => {
                 window.location.href = '/login.html';
             }, 2000);
@@ -60,7 +94,7 @@ registerForm.addEventListener('submit', async (e) => {
             return;
         }
 
-        const error = await response.data;
+        const error = response.data;
         const msg = getErrorMessage(error);
 
         if (error?.field === 'username' || msg.toLowerCase().includes('username')) {
@@ -84,4 +118,3 @@ registerForm.addEventListener('submit', async (e) => {
     }
 });
 }
-   
