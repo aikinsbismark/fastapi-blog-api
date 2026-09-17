@@ -1,6 +1,8 @@
 import { config } from "../../config.js";
 import { isAuthenticated, getCurrentAuthor, removeLocalStorage } from "../../../actions/authentication.js";
 
+export { config, removeLocalStorage } 
+
 
 
 const max_title_length = 100;
