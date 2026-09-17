@@ -1,8 +1,5 @@
 import { initializeDashboard } from "./dashboard.js";
 import { initializeNavigation } from "./navigation.js";
-import { initializePendingPosts } from "./pending-posts.js";
-import { initializePublishPage } from "./published-posts.js";
-import { loadUsers } from "./users.js";
 
 
 async function bootstrapAdmin() {
@@ -10,12 +7,6 @@ async function bootstrapAdmin() {
         await initializeDashboard();
 
         initializeNavigation();
-
-        await Promise.all([
-            initializePendingPosts(), 
-            initializePublishPage(), 
-            loadUsers(),
-        ]);
 
     } catch (error) {
         console.error("Admin dashboard failed to boot:", error);
