@@ -4,6 +4,10 @@ let token = null;
 let allUsers = [];
 let currentRoleFilter = "all";
 
+export function setUsersToken(sessionToken) {
+    token = sessionToken;
+}
+
 export async function loadUsers() {
     const response = await fetch(`${config.API_BASE_URL}/admin/users`, {
         
@@ -19,10 +23,11 @@ export async function loadUsers() {
     allUsers = await response.json();
 
     renderUsers();
+    return allUsers;
 }
 
 export function initializeRoleFilter() {
-    const filterButtons = document.querySelectorAll("#rowFilterRow.filter-chip");
+    const filterButtons = document.querySelectorAll("#roleFilterRow .filter-chip");
 
     filterButtons.forEach(button => {
         button.addEventListener("click", () => {
@@ -62,7 +67,7 @@ function renderUsers() {
     attachDeleteEvents();
 }
 
-function getFiteredUsers() {
+function getFilteredUsers() {
     if (currentRoleFilter === "all") {
         return allUsers;
     }
@@ -70,12 +75,12 @@ function getFiteredUsers() {
     return allUsers.filter((user) => user.role === currentRoleFilter);
 }
 
-function createUserRoleRow(user) {
+function createUserRow(user) {
     return `
         <tr>
             <td>
-                <strong>${escapeHTML(user.username)}</strong><br>
-                <small>${escapeHTML(user.email || "")}</small>
+                <strong>${escapeHtml(user.username)}</strong><br>
+                <small>${escapeHtml(user.email || user.email_address || "")}</small>
             </td>
             <td>${capitalize(user.role)}</td>
             <td>${formatDate(user.created_at)}</td>
@@ -83,12 +88,18 @@ function createUserRoleRow(user) {
             <td>
                 <button
                     class="delete-user"
-                    data-user-id="${user.id}"
-                    Delete
-                </button>
+                    data-user-id="${user.id}">Delete</button>
             </td>
         </tr>
     `;
+}
+
+function escapeHtml(value = "") {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;");
 }
 
 function attachDeleteEvents() {
