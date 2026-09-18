@@ -160,7 +160,7 @@ class BlogResponse(BlogInfoSchema):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict()
+    model_config = SettingsConfigDict(env_file=".env")
 
     secret_key: str = Field('SECRET_KEY')
     posts_per_page: int = 10
