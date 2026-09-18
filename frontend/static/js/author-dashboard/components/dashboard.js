@@ -1,157 +1,100 @@
-import { getAuthorSession, escapeHtml, countComments, api, removeLocalStorage } from "./author-session.js";
+import { getAuthorSession, countComments, api, removeLocalStorage } from "./author-session.js";
 import { config } from "../../config.js";
+import { renderPostList, wirePostActions } from "./delete-blog.js";
+import { startEditPost } from "./edit-blog.js";
+import { showView } from "./view-router.js";
 
-let currentFilter = ""; 
-let allBlogs = []; 
-let authToken = null;
+const RECENT_POSTS_LIMIT = 5;
 
- 
+let currentFilter = "all";
+let allBlogs = [];
+let authorToken = null;
+
+function isPublished(blog) {
+  return String(blog.status).toUpperCase().includes(config.BLOG_STATUS.PUBLISHED);
+}
+
+function isPending(blog) {
+  return String(blog.status).toUpperCase().includes(config.BLOG_STATUS.PENDING);
+}
+
 function renderStats(blogs) {
-  const isPublished = (blog) => String(blog.status).toUpperCase().includes(config.BLOG_STATUS.PUBLISHED);
-  const isPending = (blog) => String(blog.status).toUpperCase().includes(config.BLOG_STATUS.PENDING);
- 
-  const totalLikes = blogs.reduce((sum, blog) => sum + (blog.likes_count || 0), 0);
-  const totalComments = blogs.reduce((sum, blog) => sum + countComments(blog.comments), 0);
- 
-  document.getElementById("stat-total").textContent = blogs.length;
-  document.getElementById("stat-published").textContent = blogs.filter(isPublished).length;
-  document.getElementById("stat-pending").textContent = blogs.filter(isPending).length;
-  document.getElementById("stat-likes").textContent = totalLikes;
-  document.getElementById("stat-comments").textContent = totalComments;
+  const totalLikes = blogs.reduce((sum, b) => sum + (b.likes_count || 0), 0);
+  const totalComments = blogs.reduce((sum, b) => sum + countComments(b.comments), 0);
+
+  document.getElementById("statTotal").textContent = blogs.length;
+  document.getElementById("statPublished").textContent = blogs.filter(isPublished).length;
+  document.getElementById("statPending").textContent = blogs.filter(isPending).length;
+  document.getElementById("statLikes").textContent = totalLikes;
+  document.getElementById("statComments").textContent = totalComments;
 }
- 
-function statusBadge(status) {
-  const isPublished = String(status).toUpperCase().includes(config.BLOG_STATUS.PUBLISHED);
-  return isPublished
-    ? `<span class="badge published">Published</span>`
-    : `<span class="badge pending">Pending</span>`;
+
+function renderRecentPosts(blogs) {
+  const recent = [...blogs]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, RECENT_POSTS_LIMIT);
+  renderPostList(document.getElementById("recentPostList"), recent);
 }
- 
-function renderRows(blogs) {
-  const tbody = document.getElementById("blog-rows");
-  const message = document.getElementById("status-msg");
-  tbody.innerHTML = "";
- 
-  if (!blogs.length) {
-    message.innerHTML = `<div class="empty">No posts here yet.</div>`;
-    return;
-  }
-  message.innerHTML = "";
- 
-  for (const blog of blogs) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(blog.title)}</td>
-      <td>${statusBadge(blog.status)}</td>
-      <td>${blog.likes_count}</td>
-      <td>${countComments(blog.comments)}</td>
-      <td class="row-actions">
-        <a class="edit" href="edit.html?id=${blog.id}">Edit</a>
-        <button class="comments" data-id="${blog.id}" data-title="${escapeHtml(blog.title)}">Comments</button>
-        <button class="delete" data-id="${blog.id}">Delete</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  }
+
+function renderAllPosts() {
+  const filtered =
+    currentFilter === "all"
+      ? allBlogs
+      : allBlogs.filter((b) => (currentFilter === "published" ? isPublished(b) : isPending(b)));
+  renderPostList(document.getElementById("allPostList"), filtered);
 }
- 
-function applyFilterAndRender() {
-  const filtered = currentFilter
-    ? allBlogs.filter((b) => String(b.status).toUpperCase().includes(currentFilter))
-    : allBlogs;
-  renderRows(filtered);
-}
- 
+
 async function loadDashboard() {
-  const message = document.getElementById("status-msg");
-  message.innerHTML = `<div class="loading">Loading your posts…</div>`;
- 
   try {
-    allBlogs = await api.getAuthorPosts(dashboardToken);
+    allBlogs = await api.getAuthorPosts(authorToken);
     renderStats(allBlogs);
-    applyFilterAndRender();
+    renderRecentPosts(allBlogs);
+    renderAllPosts();
   } catch (error) {
-    message.innerHTML = `<div class="empty">Couldn't load your posts.</div>`;
-    console.error("Error", error);
+    console.error("loadDashboard failed:", error);
   }
 }
- 
+
 async function handleDelete(id) {
-  if (!confirm("Are you sure you want to delete this post? This action can't be undone.")) {
-    return;
-  }
- 
-  try {
-    await api.deletePost(dashboardToken, id);
-    loadDashboard();
-  } catch (error) {
-    alert("Failed to delete post.");
-    console.error(error);
-  }
+  await api.deletePost(authorToken, id);
+  await loadDashboard();
 }
- 
-function commentHtml(comment) {
-  const author = comment.author_name || comment.username || "Anonymous";
-  const body = comment.content || comment.text || "";
-  const replies = comment.replies && comment.replies.length
-    ? `<div class="replies">${comment.replies.map(commentHtml).join("")}</div>`
-    : "";
-  return `
-    <div class="comment-item">
-      <div class="meta">${escapeHtml(author)}</div>
-      <div>${escapeHtml(body)}</div>
-      ${replies}
-    </div>
-  `;
+
+function handleEdit(id) {
+  showView("compose");
+  startEditPost(id);
 }
- 
-function handleViewComments(id, title) {
-  const blog = allBlogs.find((b) => String(b.id) === String(id));
-  const body = document.getElementById("comments-body");
-  document.getElementById("comments-title").textContent = `Comments — ${title}`;
- 
-  const comments = (blog && blog.comments) || [];
-  body.innerHTML = comments.length
-    ? comments.map(commentHtml).join("")
-    : `<div class="empty">No comments yet.</div>`;
- 
-  document.getElementById("comments-modal").classList.add("open");
+
+function wireFilterChips() {
+  document.querySelectorAll("#filterRow .filter-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#filterRow .filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      currentFilter = chip.dataset.filter;
+      renderAllPosts();
+    });
+  });
 }
- 
+
 export async function initDashboardPage() {
   const session = await getAuthorSession();
   if (!session) return;
- 
-  dashboardToken = session.token;
- 
-  const nameElement = document.getElementById("author-name");
-  if (nameElement) nameElement.textContent = session.author.username || session.author.name || "";
- 
-  loadDashboard();
- 
-  document.addEventListener("click", (event) => {
-    const id = event.target.dataset.id;
-    if (event.target.classList.contains("delete")) handleDelete(id);
-    if (event.target.classList.contains("comments")) handleViewComments(id, event.target.dataset.title);
-  });
- 
-  document.getElementById("close-modal")?.addEventListener("click", () => {
-    document.getElementById("comments-modal").classList.remove("open");
-  });
-  document.getElementById("comments-modal")?.addEventListener("click", (event) => {
-    if (event.target.id === "comments-modal") event.currentTarget.classList.remove("open");
-  });
- 
-  document.querySelectorAll("#filters button").forEach((clickedButton) => {
-    clickedButton.addEventListener("click", () => {
-      document.querySelectorAll("#filters button").forEach((btn) => btn.classList.remove("active"));
-      clickedButton.classList.add("active");
-      currentFilter = clickedButton.dataset.filter;
-      applyFilterAndRender();
-    });
-  });
- 
-  document.getElementById("logout-btn")?.addEventListener("click", () => {
+
+  authorToken = session.token;
+
+  const displayName = session.author.username || session.author.name || "";
+  document.getElementById("welcomeName").textContent = displayName;
+  document.getElementById("sidebarName").textContent = displayName;
+  document.getElementById("sidebarAvatar").textContent = (displayName || "?")[0].toUpperCase();
+
+  await loadDashboard();
+
+  wirePostActions(document.getElementById("recentPostList"), { onEdit: handleEdit, onDelete: handleDelete });
+  wirePostActions(document.getElementById("allPostList"), { onEdit: handleEdit, onDelete: handleDelete });
+
+  wireFilterChips();
+
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
     removeLocalStorage("user");
     window.location.href = "/login.html";
   });
