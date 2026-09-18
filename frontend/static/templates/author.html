@@ -25,7 +25,7 @@
              <a href="#" class="nav-item" data-view="posts">
                 <i data-icon="file"></i> My Posts
             </a>
-            <a href="#" class="nav-item" data-view="write">
+            <a href="#" class="nav-item" data-view="compose">
                 <i data-icon="file"></i> Write Post
             </a>
              <a href="#" class="nav-item" data-view="analytics">
@@ -91,16 +91,15 @@
             </div>
         </div>
 
-
-            <div class="panel">
-                <div class="panel-head">
-                    <h2 class="panel-title">Recent Posts</h2>
-                    <a href="#" class="panel-link" data-goto="posts">View all posts <i data-icon="arrow-right"></i></a>
-                </div>
-                <div class="post-list" id="recentPostList">
-                    <div class="empty-state">Loading…</div>
-                </div>
+        <div class="panel">
+            <div class="panel-head">
+                <h2 class="panel-title">Recent Posts</h2>
+                <a href="#" class="panel-link" data-goto="posts">View all posts <i data-icon="arrow-right"></i></a>
             </div>
+            <div class="post-list" id="recentPostList">
+                <div class="empty-state">Loading…</div>
+            </div>
+        </div>
         </section>
 
         <section class="view" id="view-posts">
@@ -181,37 +180,37 @@
                     <div class="stat-card-value" id="anaLikes">—</div>
                     <div class="stat-card-label">Total Likes</div>
                 </div>
-                    <div class="stat-card">
-                        <div class="stat-card-icon stat-card-icon--pink"><i data-icon="chat"></i></div>
-                        <div class="stat-card-value" id="anaComments">—</div>
-                        <div class="stat-card-label">Total Comments</div>
-                    </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon stat-card-icon--pink"><i data-icon="chat"></i></div>
+                    <div class="stat-card-value" id="anaComments">—</div>
+                    <div class="stat-card-label">Total Comments</div>
                 </div>
+            </div>
 
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2 class="panel-title">Likes by post</h2>
-                    </div>
-                    <div class="bar-list" id="likesBarList">
-                        <div class="empty-state">Loading…</div>
-                    </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <h2 class="panel-title">Likes by post</h2>
                 </div>
- 
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2 class="panel-title">Comments by post</h2>
-                    </div>
-                    <div class="bar-list" id="commentsBarList">
-                        <div class="empty-state">Loading…</div>
-                    </div>
+                <div class="bar-list" id="likesBarList">
+                    <div class="empty-state">Loading…</div>
                 </div>
-            </section>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h2 class="panel-title">Comments by post</h2>
+                </div>
+                <div class="bar-list" id="commentsBarList">
+                    <div class="empty-state">Loading…</div>
+                </div>
+            </div>
+        </section>
         </main>
         </div>
     </div>
     
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="/static/js/author-dashboard/components/author.js"></script>
+    <script type="module" src="/static/js/author.js"></script>
 </body>
 </html>
