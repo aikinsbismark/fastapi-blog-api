@@ -1,6 +1,6 @@
 import { getAuthorSession, api, validatePost } from "./author-session.js";
 
-export async function initComposePage() {
+export async function initComposePage(onSaved) {
   const form = document.getElementById("postForm");
   const errorElement = document.getElementById("formError");
   const successElement = document.getElementById("formSuccess");
@@ -9,7 +9,9 @@ export async function initComposePage() {
   const cancelBtn = document.getElementById("cancelEditBtn");
 
   const session = await getAuthorSession();
-  if (!session) return;
+  if (!session) {
+    return;
+  }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -34,6 +36,8 @@ export async function initComposePage() {
         successElement.textContent = "Sent to the admin for review.";
         form.reset();
       }
+
+      await onSaved?.();
     } catch (error) {
       errorElement.textContent = error.message;
     } finally {
