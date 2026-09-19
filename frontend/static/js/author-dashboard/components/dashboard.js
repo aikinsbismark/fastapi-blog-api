@@ -44,7 +44,7 @@ function renderAllPosts() {
   renderPostList(document.getElementById("allPostList"), filtered);
 }
 
-async function loadDashboard() {
+export async function loadDashboard() {
   try {
     allBlogs = await api.getAuthorPosts(authorToken);
     renderStats(allBlogs);
