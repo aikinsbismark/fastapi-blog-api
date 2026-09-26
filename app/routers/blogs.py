@@ -1,8 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Query
 from typing import List, Optional, Annotated
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
-from ..schemas import Settings, BlogCreate, BlogPost, BlogUpdate, UserReadBlog, BlogInfoSchema, PaginatedBlogsResponse, BlogResponse
+from ..schemas import(
+    BlogCreate, 
+    BlogPost, 
+    BlogUpdate, 
+    UserReadBlog, 
+    BlogInfoSchema, 
+    PaginatedBlogsResponse, 
+    BlogResponse
+)
+from ..config import settings
 from ..enums import BlogStatus
 from ..crud import create_a_blog
 from ..crud import get_comments_by_blog, build_comment_tree
@@ -16,13 +26,11 @@ import jwt
 from jwt.exceptions import InvalidTokenError
 from ..crud import get_admin_by_name, get_author_by_name
 
+
+
 ALGORITHM = "HS256"
 
-
-
-settings = Settings()  
-
-
+ 
 
 router = APIRouter(prefix="/blog", tags=["blogs"])
 
@@ -31,7 +39,7 @@ router = APIRouter(prefix="/blog", tags=["blogs"])
 @router.post("/create", response_model=BlogPost)
 async def create_blog(blog: BlogCreate,
                       current_author: Author = Depends(get_current_active_author),
-                      db: Session = Depends(get_db)):
+                      db: AsyncSession = Depends(get_db)):
     new_blog = create_a_blog(db, blog, current_author.id)
     return new_blog
 
@@ -39,13 +47,13 @@ async def create_blog(blog: BlogCreate,
 @router.put("/{blog_id}/publish", status_code=status.HTTP_202_ACCEPTED)
 async def publish_blog(blog_id: int,
                       current_admin = Depends(get_current_active_admin),
-                      db: Session = Depends(get_db)):
+                      db: AsyncSession = Depends(get_db)):
     blog = db.execute(select(Blog).where(Blog.id == blog_id)).scalars().first()
     if not blog:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Blog not found"
-            )
+        )
     
     blog.status = BlogStatus.PUBLISHED
     db.commit()
@@ -55,7 +63,7 @@ async def publish_blog(blog_id: int,
 
 @router.get("/", response_model=PaginatedBlogsResponse)
 async def get_blogs(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = settings.posts_per_page,
     search: Optional[str] = ""
@@ -106,11 +114,18 @@ async def get_blogs(
 
 
 @router.get("/author/details")
-async def read_author_blogs_details(current_author: Author = Depends(get_current_active_author), db: Session = Depends(get_db)):
-    blogs = db.execute(select(Blog).where(Blog.author_id == current_author.id)).scalars().all()
+async def read_author_blogs_details(
+    current_author: Author = Depends(get_current_active_author), 
+    db: AsyncSession = Depends(get_db)
+):
+    blogs = await db.execute(
+        select(Blog).where(Blog.author_id == current_author.id))
+    result = blogs.scalar_one_or_none()
     result = []
     for b in blogs:
-        likes_count = db.execute(select(func.count()).select_from(Like).where(Like.blog_id == b.id)).scalar() or 0
+        likes_count = db.execute(
+            select(func.count()).select_from(Like).where(
+                Like.blog_id == b.id)).scalar() or 0
         comments = get_comments_by_blog(db, b.id)
         comments_tree = build_comment_tree(comments)
         result.append({
@@ -124,7 +139,10 @@ async def read_author_blogs_details(current_author: Author = Depends(get_current
     return result
 
 
-async def get_current_admin_or_author(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+async def get_current_admin_or_author(
+        db: AsyncSession = Depends(get_db), 
+        token: str = Depends(oauth2_scheme)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -140,12 +158,12 @@ async def get_current_admin_or_author(db: Session = Depends(get_db), token: str 
         raise credentials_exception
 
     if role == 'admin':
-        admin = get_admin_by_name(db, username=username)
+        admin = await get_admin_by_name(db, username=username)
         if not admin:
             raise credentials_exception
         return {"role": "admin", "user": admin}
     elif role == 'author':
-        author = get_author_by_name(db, username=username)
+        author = await get_author_by_name(db, username=username)
         if not author:
             raise credentials_exception
         return {"role": "author", "user": author}
@@ -154,7 +172,10 @@ async def get_current_admin_or_author(db: Session = Depends(get_db), token: str 
 
 
 @router.get("/pending", response_model=List[UserReadBlog])
-async def load_pending_blogs(current = Depends(get_current_admin_or_author), db: Session = Depends(get_db)):
+async def load_pending_blogs(
+    current = Depends(get_current_admin_or_author), 
+    db: AsyncSession = Depends(get_db)
+):
     if current.get("role") == "admin":
         return db.query(Blog).filter(Blog.status == BlogStatus.PENDING).all()
     else:
@@ -163,20 +184,26 @@ async def load_pending_blogs(current = Depends(get_current_admin_or_author), db:
 
 
 @router.get("/{id}", response_model=BlogInfoSchema)
-async def read_blog(id: int, db: Session = Depends(get_db)):
-    post = db.execute(select(Blog).filter(Blog.status==BlogStatus.PUBLISHED).where(Blog.id==id)).scalars().first()
-    if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Blog not found")
-    return post
+async def read_blog(id: int, db: AsyncSession = Depends(get_db)):
+    post = await db.execute(
+        select(Blog).filter(Blog.status==BlogStatus.PUBLISHED).where(Blog.id==id))
+    result = post.scalar_one_or_none()
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Blog not found"
+        )
+    return result
 
 
 @router.put("/update/{id}", response_model=BlogCreate)
-async def update_blog(blog: BlogUpdate, id: int, db: Session = Depends(get_db)):
-    post_in_db = db.execute(select(Blog).where(Blog.id == id)).scalars().first()
-    if not post_in_db:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-        detail="Blog does not exist"
+async def update_blog(blog: BlogUpdate, id: int, db: AsyncSession = Depends(get_db)):
+    post = db.execute(select(Blog).where(Blog.id == id))
+    result = post.scalar_one_or_none()
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Blog does not exist"
         )
     update_data = blog.model_dump(exclude_unset=True)
     if not update_data: 
@@ -185,35 +212,45 @@ async def update_blog(blog: BlogUpdate, id: int, db: Session = Depends(get_db)):
         stmt = update(Blog).where(Blog.id == id).values(update_data)
         db.execute(stmt)
         db.commit()
-    updated_post = db.execute(select(Blog).where(Blog.id == id)).scalars().first()
-    return updated_post
+    updated_post = await db.execute(select(Blog).where(Blog.id == id))
+    result = updated_post.scalar_one_or_none()
+    return result
 
 
 @router.delete("/delete/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_blog_post(id: int,
-                           current = Depends(get_current_admin_or_author),
-                           db: Session = Depends(get_db)):
-    blog_post = db.execute(select(Blog).where(Blog.id == id)).scalars().first()
-    if not blog_post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Blog not found")
+async def delete_blog_post(
+    id: int,
+    current = Depends(get_current_admin_or_author),
+    db: AsyncSession = Depends(get_db)
+):
+    blog = await db.execute(select(Blog).where(Blog.id == id))
+    result = blog.scalar_one_or_none()
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Blog not found"
+        )
 
     role = current.get("role")
     user = current.get("user")
 
     if role == "admin":
-        db.delete(blog_post)
+        db.delete(blog)
         db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     if role == "author":
-        if getattr(blog_post, 'author_id', None) == getattr(user, 'id', None):
-            db.delete(blog_post)
+        if getattr(result, 'author_id', None) == getattr(user, 'id', None):
+            db.delete(result)
             db.commit()
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         else:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                detail="Not authorized to delete this blog")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete this blog"
+            )
 
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Not authorized to delete this blog")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not authorized to delete this blog"
+    )
