@@ -10,18 +10,18 @@ from contextlib import asynccontextmanager
 
 
 
-Base.metadata.create_all(bind=engine)
-
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
 
 
 
 app = FastAPI(lifespan=lifespan)
+
 
 base_dir = Path(__file__).resolve().parent.parent
 static_dir = base_dir / "frontend" / "static"
