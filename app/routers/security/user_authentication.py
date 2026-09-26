@@ -1,18 +1,18 @@
 from datetime import datetime, timedelta, timezone
-
 import jwt
+import secrets
+import hashlib
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
-from sqlalchemy.orm import Session
-from ...schemas import UserSchema, TokenData, Settings
+from sqlalchemy.ext.asyncio import AsyncSession
+from ...schemas import UserSchema, TokenData
 from ...crud import get_user_by_username
 from ...dependencies import get_db
+from ...config import settings
 
 
-
-settings = Settings()
 
 
 
@@ -21,7 +21,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 password_hash = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/token")  
 
 
 def get_password_hash(plain_password: str) -> str:
@@ -30,7 +30,13 @@ def get_password_hash(plain_password: str) -> str:
 def verify_password(plain_password: str, hashed_password) -> bool:
     return password_hash.verify(plain_password, hashed_password)
 
-def authenticate_user(db: Session, username: str, password: str):
+def generate_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+async def authenticate_user(db: AsyncSession, username: str, password: str):
     user = get_user_by_username(db, username)
     if not user:
         return False
@@ -45,25 +51,28 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.secret_key.get_secret_value(), algorithm=ALGORITHM)
     return encoded_jwt
 
 
-async def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+async def get_current_user(
+        db: AsyncSession = Depends(get_db), 
+        token: str = Depends(oauth2_scheme)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[ALGORITHM])
         username = payload.get("sub")
         if not username:
             raise credentials_exception
         token_data = TokenData(username=username)
     except InvalidTokenError:
         raise credentials_exception
-    user = get_user_by_username(db, username=token_data.username)
+    user = await get_user_by_username(db, username=token_data.username)
     if not user:
         raise credentials_exception
     return user

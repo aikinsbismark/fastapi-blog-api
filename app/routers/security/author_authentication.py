@@ -1,32 +1,30 @@
 from datetime import datetime, timedelta, timezone
 import jwt
+import secrets
+import hashlib
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
-from sqlalchemy.orm import Session
-from ...schemas import AuthorBase, TokenData, Settings
+from sqlalchemy.ext.asyncio import AsyncSession
+from ...schemas import AuthorBase, TokenData
 from ...crud import get_author_by_name
 from ...dependencies import get_db
+from ...config import settings
 
 
 
 
-settings = Settings()
+
 
 
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-max_upload_size_bytes: int = 5 * 1024 * 1024  
-
-posts_per_page: int = 10
-
-
 password_hash = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="author/login")  
 
 
 
@@ -36,8 +34,14 @@ def get_password_hash(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_hash.verify(plain_password, hashed_password)
 
-def authenticate_author(db: Session, username: str, password: str):
-    author = get_author_by_name(db, username)
+def generate_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+async def authenticate_author(db: AsyncSession, username: str, password: str):
+    author = await get_author_by_name(db, username)
     if not author:
         return False
     if verify_password(password, author.hashed_password):
@@ -51,25 +55,28 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.secret_key.get_secret_value(), algorithm=ALGORITHM)
     return encoded_jwt
 
 
-async def get_current_author(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+async def get_current_author(
+        db: AsyncSession = Depends(get_db), 
+        token: str = Depends(oauth2_scheme)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[ALGORITHM])
         username = payload.get("sub")
         if not username:
             raise credentials_exception
         token_data = TokenData(username=username)
     except InvalidTokenError:
         raise credentials_exception
-    author = get_author_by_name(db, username=token_data.username)
+    author = await get_author_by_name(db, username=token_data.username)
     if not author:
         raise credentials_exception
     return author
