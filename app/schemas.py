@@ -1,6 +1,5 @@
 from fastapi import Form
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from datetime import datetime
 from .models import BlogStatus
 
@@ -9,7 +8,7 @@ class AdminUserCreate(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
     username: str
-    email_address: EmailStr
+    email: EmailStr
     password: str
 
 
@@ -159,8 +158,15 @@ class BlogResponse(BlogInfoSchema):
     author: AuthorBase
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env")
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr = Field(max_length=120)
 
-    secret_key: str = Field('SECRET_KEY')
-    posts_per_page: int = 10
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
