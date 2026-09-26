@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import List
+
 from datetime import datetime
 from sqlalchemy import String, ForeignKey, DateTime, Enum, Boolean
 from sqlalchemy.sql import func
@@ -15,10 +16,15 @@ class AdminUser(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String, nullable=False)
-    email_address: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=True)
+    disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
     author: Mapped[List["Author"]] = relationship(back_populates="admin_user")
+    reset_token: Mapped[list["AdminPasswordResetToken"]] = relationship(
+        back_populates="admin_user",
+        cascade="all, delete-orphan", 
+    )
 
 
 class Author(Base):
@@ -26,15 +32,19 @@ class Author(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String, nullable=False)  
-    email_address: Mapped[str] = mapped_column(String, unique=True, nullable=False)   
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)   
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)   
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    admin_user_id: Mapped[int | None] = mapped_column(ForeignKey("admin_user.id"), nullable=True)
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admin_user.id"), nullable=True)
     admin_user: Mapped["AdminUser"] = relationship(back_populates="author")
     blog: Mapped[List["Blog"]] = relationship(back_populates="author")
     disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
+    reset_token: Mapped[list["AuthorPasswordResetToken"]] = relationship(
+        back_populates="author",
+        cascade="all, delete-orphan",
+    )
 
 
 class UserModel(Base):
@@ -42,12 +52,17 @@ class UserModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
     like: Mapped[List["Like"]] = relationship(back_populates="user")
     comment: Mapped[List["Comment"]] = relationship(back_populates="user")
     reads: Mapped[List["UserReadsBlogs"]] = relationship(
         back_populates="user"
+    )
+    reset_token: Mapped[list["UserPasswordResetToken"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
 
@@ -115,3 +130,42 @@ class Like(Base):
     user: Mapped["UserModel"] = relationship(back_populates="like")
     blog_id: Mapped[int | None] = mapped_column(ForeignKey("blogs.id"))
     blog: Mapped["Blog"] = relationship(back_populates="like")
+
+
+class AdminPasswordResetToken(Base):
+    __tablename__ = "admin_password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    admin_id: Mapped[int] = mapped_column(ForeignKey("admin_user.id"), nullable=False)
+    admin_user: Mapped["AdminUser"] = relationship(back_populates="reset_token")
+
+
+class AuthorPasswordResetToken(Base):
+    __tablename__ = "author_password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    author_id: Mapped[int] = mapped_column(ForeignKey("authors.id"), nullable=False)
+    author: Mapped["Author"] = relationship(back_populates="reset_token")
+
+
+class UserPasswordResetToken(Base):
+    __tablename__ = "user_password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user: Mapped["UserModel"] = relationship(back_populates="reset_token")
