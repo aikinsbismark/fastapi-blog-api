@@ -39,13 +39,15 @@ class UserCreate(BaseModel):
 
     username: str
     password: str 
+    email: EmailStr
 
 
 class UserRead(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
     id: int
-    username: str 
+    username: str
+    email: EmailStr 
 
 
 class Token(BaseModel):
@@ -62,7 +64,7 @@ class AuthorBase(BaseModel):
 
     id: int
     username: str
-    email_address: EmailStr
+    email: EmailStr
     disabled: bool | None = None
     
 
@@ -70,7 +72,7 @@ class AuthorCreate(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
     username: str
-    email_address: EmailStr
+    email: EmailStr
     password: str
 
 
