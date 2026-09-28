@@ -37,7 +37,7 @@ def hash_reset_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 async def authenticate_user(db: AsyncSession, username: str, password: str):
-    user = get_user_by_username(db, username)
+    user = await get_user_by_username(db, username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
