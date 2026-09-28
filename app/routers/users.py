@@ -63,7 +63,7 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
         )
     hashed_password = get_password_hash(user.password)
     user.password = hashed_password
-    user_create = create_user(db, user)
+    user_create = await create_user(db, user)
     return user_create
 
     
@@ -144,14 +144,14 @@ async def reset_password(
         )
     )
     reset_token = result.scalar_one_or_none()
-
+    
     if not reset_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
         )
 
-    if reset_token.expires_at < datetime.now(UTC):
+    if reset_token.expires_at < datetime.now(UTC).replace(tzinfo=None):
         await db.delete(reset_token)
         await db.commit()
         raise HTTPException(
@@ -169,7 +169,8 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
         )
-    user.password_hash = get_password_hash(request_data.new_password)
+    print("Success: All checks passed. Updating password...")
+    user.hashed_password = get_password_hash(request_data.new_password)
 
     await db.execute(
         sql_delete(UserPasswordResetToken).where(
@@ -188,7 +189,7 @@ async def change_password(
     current_user = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    if not verify_password(password_data.current_password, current_user.password_hash):
+    if not verify_password(password_data.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
@@ -196,8 +197,8 @@ async def change_password(
     current_user.password_hash = get_password_hash(password_data.new_password)
 
     await db.execute(
-        select(UserPasswordResetToken).where(
-            UserPasswordResetToken.author_id == current_user.id
+        sql_delete(UserPasswordResetToken).where(
+            UserPasswordResetToken.user_id == current_user.id
         )
     )
     await db.commit()
@@ -211,7 +212,8 @@ async def read_current_user(current_user: UserSchema = Depends(get_current_activ
 
 @router.get("/{user_id}")
 async def read_user(user_id: int, db: AsyncSession = Depends(get_db)):
-    user = db.execute(select(UserModel).where(UserModel.id == user_id)).scalars().first()
+    result = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
