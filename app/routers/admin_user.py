@@ -27,8 +27,7 @@ from .security.admin_authentication import (
 )
 from ..models import AdminUser, AdminPasswordResetToken, UserModel
 from .security.admin_authentication import (
-    get_current_active_admin,
-    get_current_admin
+    get_current_active_admin
 ) 
 
 
@@ -121,7 +120,7 @@ async def forgot_password(
 
         admin_email = admin.email
         admin_username = admin.username 
-        
+
         background_tasks.add_task(
             send_password_reset_email,
             to_email=admin_email,
@@ -154,7 +153,8 @@ async def reset_password(
             detail="Invalid or expired reset token"
         )
 
-    if reset_token.expires_at < datetime.now(UTC):
+    if reset_token.expires_at < datetime.now(UTC).replace(tzinfo=None):
+        print("Fail: Token expired according to timestamps")
         await db.delete(reset_token)
         await db.commit()
         raise HTTPException(
@@ -172,11 +172,11 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
         )
-    user.password_hash = get_password_hash(request_data.new_password)
+    user.hashed_password = get_password_hash(request_data.new_password)
 
     await db.execute(
         sql_delete(AdminPasswordResetToken).where(
-            AdminPasswordResetToken.admin_user_id == user.id
+            AdminPasswordResetToken.admin_id == user.id
         )
     )
     await db.commit()
@@ -191,16 +191,16 @@ async def change_password(
     current_user = Depends(get_current_active_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    if not verify_password(password_data.current_password, current_user.password_hash):
+    if not verify_password(password_data.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
-    current_user.password_hash = get_password_hash(password_data.new_password)
+    current_user.hashed_password = get_password_hash(password_data.new_password)
 
     await db.execute(
-        select(AdminPasswordResetToken).where(
-            AdminPasswordResetToken.admin_user_id == current_user.id
+        sql_delete(AdminPasswordResetToken).where(
+            AdminPasswordResetToken.admin_id == current_user.id
         )
     )
     await db.commit()
@@ -209,8 +209,8 @@ async def change_password(
 
 @admin_router.get("/users", dependencies=[Depends(get_current_active_admin)])
 async def list_users(db: AsyncSession = Depends(get_db)):
-    users = db.execute(select(UserModel)).scalar_one_or_none()
-    return users
+    users = await db.execute(select(UserModel))
+    return users.scalar_one_or_none()
 
 
 @admin_router.delete("/users/{user_id}")
@@ -219,17 +219,13 @@ async def delete_user(
     current_admin = Depends(get_current_active_admin), 
     db: AsyncSession = Depends(get_db)
 ):
-    if user_id == current_admin.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You cannot delete your own account"
-        )
-    user = db.execute(select(UserModel).where(UserModel.id == user_id)).scalars().first()
+    result = await db.execute(select(UserModel).where(UserModel.id == user_id))
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="User not found"
         )
-    db.delete(user)
-    db.commit()
+    await db.delete(user)
+    await db.commit()
     return {"message": "User deleted"}
