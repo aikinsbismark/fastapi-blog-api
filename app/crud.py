@@ -24,7 +24,11 @@ async def get_admin_by_name(db: AsyncSession, username: str):
 
 
 async def create_user(db: AsyncSession, user: UserCreate):
-    user_db = UserModel(username=user.username, hashed_password=user.password)
+    user_db = UserModel(
+        username=user.username,
+        email=user.email,
+        hashed_password=user.password
+    )
     db.add(user_db)
     await db.commit()
     await db.refresh(user_db)
