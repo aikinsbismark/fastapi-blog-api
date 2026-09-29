@@ -2,7 +2,13 @@ from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import AdminUser, UserModel, Author, Blog, Comment, Like
-from .schemas import AdminUserCreate, UserCreate, BlogCreate, AuthorCreate, CommentCreate, LikePost
+from .schemas import (
+     AdminUserCreate, 
+     UserCreate, 
+     BlogCreate, 
+     AuthorCreate, 
+     CommentCreate
+)
 
 
 
@@ -77,35 +83,41 @@ async def is_admin(db: AsyncSession, admin: AdminUser):
     return result
 
 
-async def create_comment(db: AsyncSession, blog_id: int, comment: CommentCreate):
+async def create_comment(
+        db: AsyncSession, 
+        blog_id: int, 
+        user_id: int,
+        comment: CommentCreate
+):
     new_comment = Comment(
         blog_id=blog_id,
-        user_id=comment.user_id,
+        user_id=user_id,
         content=comment.content,
         parent_id=getattr(comment, 'parent_id', None),
     )
+
     db.add(new_comment)
     await db.commit()
     await db.refresh(new_comment)
     return new_comment
 
 async def get_comments_by_blog(db: AsyncSession, blog_id: int):
-    comment = await db.execute(select(Comment).where(Comment.blog_id == blog_id).order_by(Comment.created_at))
-    return comment.scalar_one_or_none()
+    comments = await db.execute(select(Comment).where(Comment.blog_id == blog_id).order_by(Comment.created_at))
+    return comments.scalars().all()
 
 
 def build_comment_tree(comments: list[Comment]):
     nodes: dict[int, dict] = {}
     roots: list[dict] = []
 
-    for c in comments:
-        nodes[c.id] = {
-            'id': c.id,
-            'parent_id': c.parent_id,
-            'blog_id': c.blog_id,
-            'user_id': c.user_id,
-            'content': c.content,
-            'created_at': c.created_at.isoformat() if hasattr(c.created_at, 'isoformat') else c.created_at,
+    for comment in comments:
+        nodes[comment.id] = {
+            'id': comment.id,
+            'parent_id': comment.parent_id,
+            'blog_id': comment.blog_id,
+            'user_id': comment.user_id,
+            'content': comment.content,
+            'created_at': comment.created_at.isoformat() if hasattr(comment.created_at, 'isoformat') else comment.created_at,
             'children': []
         }
 
@@ -120,18 +132,20 @@ def build_comment_tree(comments: list[Comment]):
 
 
 async def create_like(
-        db: AsyncSession, like: LikePost, 
+        db: AsyncSession, 
+        user_id: int, 
         blog_id: int | None = None, 
         comment_id: int | None = None
 ):
     like_on = Like(
-        user_id=like.user_id,
+        user_id=user_id,
         blog_id=blog_id,
         comment_id=comment_id
     )
     db.add(like_on)
     await db.commit()
     await db.refresh(like_on)
+
     return like_on
 
 
@@ -142,57 +156,66 @@ async def toggle_like(
         comment_id: int | None = None
 ):
     if blog_id is not None:
-        existing = await db.execute(
+        result = await db.execute(
             select(Like).where(Like.user_id == user_id, Like.blog_id == blog_id)
         )
-        result = existing.scalar_one_or_none()
         
     elif comment_id is not None:
-        result = db.execute(select(Like).where(Like.user_id == user_id, Like.comment_id == comment_id)).scalar_one_or_none()
+        result = await db.execute(select(Like).where(Like.user_id == user_id, Like.comment_id == comment_id))
     else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Must specify blog_id or comment_id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Must specify blog_id or comment_id"
+        )
 
-    if result:
-        db.delete(result)
-        db.commit()
-        likes_count = 0
+    existing_like = result.scalar_one_or_none()
+
+    if existing_like:
+        await db.delete(existing_like)
+        await db.commit()
+
         if blog_id is not None:
-            likes_count = await db.execute(
-                select(func.count()).select_from(Like).where(Like.blog_id == blog_id)
+            count_query = select(func.count()).select_from(Like).where(
+                Like.blog_id == blog_id
             )
-            result = likes_count.scalar_one()
-        elif comment_id is not None:
-            likes_count = await db.execute(
-                select(func.count()).select_from(Like).where(
-                    Like.comment_id == comment_id)
+        else:
+            count_query = select(func.count()).select_from(Like).where(
+                Like.comment_id == comment_id
             )
-            result = likes_count.scalar_one()
+
+        count_result = await db.execute(count_query)
+        likes_count = count_result.scalar_one()
 
         return {
-            'is_liked': False,
-            'like_id': None,
-            'likes_count': int(likes_count),
+            "is_liked": False,
+            "like_id": None,
+            "likes_count": likes_count,
         }
 
-    new_like = Like(user_id=user_id, blog_id=blog_id, comment_id=comment_id)
+    new_like = Like(
+        user_id=user_id,
+        blog_id=blog_id,
+        comment_id=comment_id,
+    )
+
     db.add(new_like)
     await db.commit()
     await db.refresh(new_like)
 
-    likes_count = 0
     if blog_id is not None:
-        likes_count = await db.execute(
-            select(func.count()).select_from(Like).where(Like.blog_id == blog_id)
+        count_query = select(func.count()).select_from(Like).where(
+            Like.blog_id == blog_id
         )
-        result = likes_count.scalar_one()
-    elif comment_id is not None:
-        likes_count = await db.execute(
-            select(func.count()).select_from(Like).where(Like.comment_id == comment_id)
+    else:
+        count_query = select(func.count()).select_from(Like).where(
+            Like.comment_id == comment_id
         )
-        result = likes_count.scalar_one()
+
+    count_result = await db.execute(count_query)
+    likes_count = count_result.scalar_one()
 
     return {
-        'is_liked': True,
-        'like_id': new_like.id,
-        'likes_count': int(likes_count),
+        "is_liked": True,
+        "like_id": new_like.id,
+        "likes_count": likes_count,
     }
