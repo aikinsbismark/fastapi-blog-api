@@ -60,7 +60,7 @@ class TokenData(BaseModel):
 
 
 class AuthorBase(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='ignore', from_attributes=True)
 
     id: int
     username: str
@@ -119,7 +119,7 @@ class CommentRead(BaseModel):
 
 
 class UserReadBlog(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='ignore', from_attributes=True)
 
     id: int
     title: str
@@ -136,9 +136,8 @@ class BlogInfoSchema(BaseModel):
 
 
 class LikePost(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    pass
 
-    user_id: int
 
 
 class PaginatedBlogsResponse(BaseModel):
