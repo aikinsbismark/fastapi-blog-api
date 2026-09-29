@@ -29,8 +29,7 @@ from .security.user_authentication import (
     authenticate_user,
     generate_reset_token,
     hash_reset_token,
-    verify_password,
-    ACCESS_TOKEN_EXPIRE_MINUTES 
+    verify_password
 )
 from ..models import UserModel, UserPasswordResetToken
 from ..config import settings
@@ -80,8 +79,8 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"}
-            )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username, "role": "user"}, expires_delta=access_token_expires
         )
