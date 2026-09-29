@@ -22,8 +22,7 @@ from .security.admin_authentication import (
     generate_reset_token,
     hash_reset_token, 
     create_access_token,
-    verify_password,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    verify_password
 )
 from ..models import AdminUser, AdminPasswordResetToken, UserModel
 from .security.admin_authentication import (
@@ -75,7 +74,7 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": admin_user.username, "role": "admin"}, expires_delta=access_token_expires
         )

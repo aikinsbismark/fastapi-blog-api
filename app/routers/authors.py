@@ -27,8 +27,7 @@ from .security.author_authentication import (
     get_password_hash, 
     generate_reset_token,
     hash_reset_token,
-    verify_password,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    verify_password
 )
 from .security.author_authentication import get_current_active_author
 from ..email_utils import send_password_reset_email
@@ -76,7 +75,7 @@ async def login(
             detail="Incorrect username or Password",
             headers={"WWW-Authenticate": "Bearer"}
             )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": author.username, "role": "author"}, expires_delta=access_token_expires
         )
