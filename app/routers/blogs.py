@@ -9,8 +9,7 @@ from ..schemas import(
     BlogUpdate, 
     UserReadBlog, 
     BlogInfoSchema, 
-    PaginatedBlogsResponse, 
-    BlogResponse
+    PaginatedBlogsResponse
 )
 from ..config import settings
 from ..enums import BlogStatus
@@ -27,9 +26,6 @@ from jwt.exceptions import InvalidTokenError
 from ..crud import get_admin_by_name, get_author_by_name
 
 
-
-ALGORITHM = "HS256"
-
  
 
 router = APIRouter(prefix="/blog", tags=["blogs"])
@@ -40,15 +36,16 @@ router = APIRouter(prefix="/blog", tags=["blogs"])
 async def create_blog(blog: BlogCreate,
                       current_author: Author = Depends(get_current_active_author),
                       db: AsyncSession = Depends(get_db)):
-    new_blog = create_a_blog(db, blog, current_author.id)
-    return new_blog
+    blog = await create_a_blog(db, blog, current_author.id)
+    return blog
 
 
 @router.put("/{blog_id}/publish", status_code=status.HTTP_202_ACCEPTED)
 async def publish_blog(blog_id: int,
                       current_admin = Depends(get_current_active_admin),
                       db: AsyncSession = Depends(get_db)):
-    blog = db.execute(select(Blog).where(Blog.id == blog_id)).scalars().first()
+    result = await db.execute(select(Blog).where(Blog.id == blog_id))
+    blog = result.scalar_one_or_none()
     if not blog:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -56,8 +53,8 @@ async def publish_blog(blog_id: int,
         )
     
     blog.status = BlogStatus.PUBLISHED
-    db.commit()
-    db.refresh(blog)
+    await db.commit()
+    await db.refresh(blog)
     return blog
     
 
@@ -66,41 +63,48 @@ async def get_blogs(
     db: AsyncSession = Depends(get_db),
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = settings.posts_per_page,
-    search: Optional[str] = ""
+    search: Optional[str] = "",
 ):
-    count_result = db.execute(
-        select(func.count()).select_from(Blog).where(
-            Blog.title.contains(search),
-            Blog.status == BlogStatus.PUBLISHED
-        )
+    filters = (
+        Blog.title.contains(search),
+        Blog.status == BlogStatus.PUBLISHED,
+    )
+
+    count_result = await db.execute(
+        select(func.count()).select_from(Blog).where(*filters)
     )
     total = count_result.scalar() or 0
 
-    result = db.execute(
+    result = await db.execute(
         select(Blog)
         .options(selectinload(Blog.author))
-        .where(
-            Blog.title.contains(search),
-            Blog.status == BlogStatus.PUBLISHED
-        )
+        .where(*filters)
         .order_by(Blog.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
     blogs = result.scalars().all()
 
-    blog_entries = []
-    for blog in blogs:
-        likes_count = db.execute(select(func.count()).select_from(Like).where(Like.blog_id == blog.id)).scalar() or 0
-        blog_entries.append(
-            UserReadBlog.model_validate({
-                'id': blog.id,
-                'title': blog.title,
-                'content': blog.content,
-                'author': blog.author,
-                'likes_count': likes_count,
-            })
+    blog_ids = [blog.id for blog in blogs]
+    likes_by_blog: dict[int, int] = {}
+    if blog_ids:
+        likes_result = await db.execute(
+            select(Like.blog_id, func.count())
+            .where(Like.blog_id.in_(blog_ids))
+            .group_by(Like.blog_id)
         )
+        likes_by_blog = dict(likes_result.all())
+
+    blog_entries = [
+        UserReadBlog.model_validate({
+            "id": blog.id,
+            "title": blog.title,
+            "content": blog.content,
+            "author": blog.author,
+            "likes_count": likes_by_blog.get(blog.id, 0),
+        })
+        for blog in blogs
+    ]
 
     has_more = skip + len(blogs) < total
 
@@ -118,25 +122,28 @@ async def read_author_blogs_details(
     current_author: Author = Depends(get_current_active_author), 
     db: AsyncSession = Depends(get_db)
 ):
-    blogs = await db.execute(
+    result = await db.execute(
         select(Blog).where(Blog.author_id == current_author.id))
-    result = blogs.scalar_one_or_none()
-    result = []
-    for b in blogs:
-        likes_count = db.execute(
+    blogs = result.scalars().all()
+    blog_entries = []
+    for blog in blogs:
+        likes_result = await db.execute(
             select(func.count()).select_from(Like).where(
-                Like.blog_id == b.id)).scalar() or 0
-        comments = get_comments_by_blog(db, b.id)
+                Like.blog_id == blog.id))
+        likes_count = likes_result.scalar() or 0
+
+        comments = await get_comments_by_blog(db, blog.id)
         comments_tree = build_comment_tree(comments)
-        result.append({
-            'id': b.id,
-            'title': b.title,
-            'content': b.content,
-            'status': str(b.status),
+
+        blog_entries.append({
+            'id': blog.id,
+            'title': blog.title,
+            'content': blog.content,
+            'status': str(blog.status),
             'likes_count': likes_count,
             'comments': comments_tree,
         })
-    return result
+    return blog_entries
 
 
 async def get_current_admin_or_author(
@@ -149,7 +156,7 @@ async def get_current_admin_or_author(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[settings.ALGORITHM])
         username = payload.get("sub")
         role = payload.get("role")
         if not username or not role:
@@ -177,30 +184,34 @@ async def load_pending_blogs(
     db: AsyncSession = Depends(get_db)
 ):
     if current.get("role") == "admin":
-        return db.query(Blog).filter(Blog.status == BlogStatus.PENDING).all()
+        result = await db.execute(select(Blog).filter(Blog.status == BlogStatus.PENDING))
+        return result.all()
     else:
         author = current.get("user")
-        return db.query(Blog).filter(Blog.status == BlogStatus.PENDING, Blog.author_id == author.id).all()
+        result = await db.execute(select(Blog).filter(
+            Blog.status == BlogStatus.PENDING, Blog.author_id == author.id)
+        )
+        return result.all()
 
 
 @router.get("/{id}", response_model=BlogInfoSchema)
 async def read_blog(id: int, db: AsyncSession = Depends(get_db)):
-    post = await db.execute(
+    result = await db.execute(
         select(Blog).filter(Blog.status==BlogStatus.PUBLISHED).where(Blog.id==id))
-    result = post.scalar_one_or_none()
-    if not result:
+    post = result.scalar_one_or_none()
+    if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Blog not found"
         )
-    return result
+    return post
 
 
 @router.put("/update/{id}", response_model=BlogCreate)
 async def update_blog(blog: BlogUpdate, id: int, db: AsyncSession = Depends(get_db)):
-    post = db.execute(select(Blog).where(Blog.id == id))
-    result = post.scalar_one_or_none()
-    if not result:
+    result = await db.execute(select(Blog).where(Blog.id == id))
+    post = result.scalar_one_or_none()
+    if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Blog does not exist"
@@ -211,10 +222,10 @@ async def update_blog(blog: BlogUpdate, id: int, db: AsyncSession = Depends(get_
     else:
         stmt = update(Blog).where(Blog.id == id).values(update_data)
         db.execute(stmt)
-        db.commit()
-    updated_post = await db.execute(select(Blog).where(Blog.id == id))
-    result = updated_post.scalar_one_or_none()
-    return result
+        await db.commit()
+    result = await db.execute(select(Blog).where(Blog.id == id))
+    updated_post = result.scalar_one_or_none()
+    return updated_post
 
 
 @router.delete("/delete/{id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -223,9 +234,9 @@ async def delete_blog_post(
     current = Depends(get_current_admin_or_author),
     db: AsyncSession = Depends(get_db)
 ):
-    blog = await db.execute(select(Blog).where(Blog.id == id))
-    result = blog.scalar_one_or_none()
-    if not result:
+    result = await db.execute(select(Blog).where(Blog.id == id))
+    blog = result.scalar_one_or_none()
+    if not blog:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Blog not found"
@@ -235,22 +246,17 @@ async def delete_blog_post(
     user = current.get("user")
 
     if role == "admin":
-        db.delete(blog)
-        db.commit()
+        await db.delete(blog)
+        await db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     if role == "author":
         if getattr(result, 'author_id', None) == getattr(user, 'id', None):
-            db.delete(result)
-            db.commit()
+            await db.delete(result)
+            await db.commit()
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to delete this blog"
             )
-
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not authorized to delete this blog"
-    )
