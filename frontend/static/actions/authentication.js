@@ -14,6 +14,34 @@ const loginEndpoints = {
     user: `${config.API_BASE_URL}/user/token`
 };
 
+
+const changePasswordPoints = {
+    admin: `${config.API_BASE_URL}/admin/me/password`,
+    author: `${config.API_BASE_URL}/author/me/password`,
+    user: `${config.API_BASE_URL}/user/me/password`
+};
+
+
+const forgotPasswordEndpoints = {
+    admin: `${config.API_BASE_URL}/admin/forgot-password`,
+    author: `${config.API_BASE_URL}/author/forgot-password`,
+    user: `${config.API_BASE_URL}/user/forgot-password`
+};
+
+
+const resetPasswordEndpoints = {
+    admin: `${config.API_BASE_URL}/admin/reset-password`,
+    author: `${config.API_BASE_URL}/author/reset-password`,
+    user: `${config.API_BASE_URL}/user/reset-password`
+};
+
+
+export const extractToken = (storedUser) => {
+    return storedUser?.access_token ?? storedUser?.token ?? storedUser?.jwt ?? null;
+};
+
+
+
 export const signup = async (user, role) => {
     const url = signupEndpoint[role];
     const response = await fetch(url, {
@@ -145,6 +173,85 @@ export const getCurrentUser = async (token) => {
         return null;
     }
 };
+
+
+export const changePassword = async(token, role, currentPassword, newPassword) => {
+    const url = changePasswordEndPoints[role];
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            current_password: currentPassword,
+            new_password: newPassword
+        })
+    });
+
+    try {
+        data = await response.json();
+    } catch (error) {
+        console.error("Unable to parse response.");
+    }
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        data,
+    };
+};
+
+
+export const forgotPassword = async(email, role) => {
+    const url = forgotPasswordPoints[role];
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email_address: email })
+    });
+
+    try {
+        data = await response.json();
+    } catch (error) {
+        console.error("Unable to parse response.");
+    }
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        data,
+    };
+};
+
+
+export const resetPassword = async(token, role, newPassword) => {
+    const url = resetPasswordEndPoints[role];
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ new_password: newPassword })
+    });
+
+    try {
+        data = await response.json();
+    } catch (error) {
+        console.error("Unable to parse response.");
+    }
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        data,
+    };
+};
+
+
+
 
 export const setLocalStorage = (key, value) => {
     localStorage.setItem(key, JSON.stringify(value));
