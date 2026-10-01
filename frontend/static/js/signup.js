@@ -54,7 +54,7 @@ registerForm.addEventListener('submit', async (event) => {
     const userData = {
         username: formData.get('username'),
         password: formData.get('password'),
-        email_address: formData.get('email'),
+        email: formData.get('email'),
     };
 
     try {
