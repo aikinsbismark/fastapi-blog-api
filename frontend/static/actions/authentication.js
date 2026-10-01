@@ -204,14 +204,16 @@ export const changePassword = async(token, role, currentPassword, newPassword) =
 
 
 export const forgotPassword = async(email, role) => {
-    const url = forgotPasswordPoints[role];
+    const url = forgotPasswordEndpoints[role];
     const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email_address: email })
+        body: JSON.stringify({ email: email })
     });
+
+    let data = {}
 
     try {
         data = await response.json();
