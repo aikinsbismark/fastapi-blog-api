@@ -35,10 +35,6 @@ async def root() -> FileResponse:
     return FileResponse(templates_dir / "index.html")
 
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon() -> FileResponse:
-    return FileResponse(static_dir / "icons" / "favicon.ico")
-
 
 @app.get("/{page}.html", response_class=FileResponse)
 async def html_page(page: str) -> FileResponse:
