@@ -8,6 +8,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .enums import BlogStatus
 from .core import Base
+from .config import settings
 
 
 
@@ -20,11 +21,26 @@ class AdminUser(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=True)
     disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
-    author: Mapped[List["Author"]] = relationship(back_populates="admin_user")
+    image_file: Mapped[str | None] = mapped_column(
+            String,
+            nullable=True,
+            default=None
+        )
+    author: Mapped[List["Author"]] = relationship(
+        back_populates="admin_user", 
+        lazy="raise_on_sql"
+    )
     reset_token: Mapped[list["AdminPasswordResetToken"]] = relationship(
         back_populates="admin_user",
-        cascade="all, delete-orphan", 
+        cascade="all, delete-orphan",
+        lazy="raise_on_sql" 
     )
+
+    @property
+    def image_path(self) -> str:
+        if self.image_file:
+            return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/profile_pics/{self.image_file}"
+        return "/static/profile_pics/defualt.jpg"
 
 
 class Author(Base):
@@ -37,14 +53,29 @@ class Author(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    image_file: Mapped[str | None] = mapped_column(
+            String,
+            nullable=True,
+            default=None
+        )
     admin_id: Mapped[int | None] = mapped_column(ForeignKey("admin_user.id"), nullable=True)
     admin_user: Mapped["AdminUser"] = relationship(back_populates="author")
-    blog: Mapped[List["Blog"]] = relationship(back_populates="author")
+    blog: Mapped[List["Blog"]] = relationship(
+        back_populates="author", 
+        lazy="raise_on_sql"
+    )
     disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
     reset_token: Mapped[list["AuthorPasswordResetToken"]] = relationship(
         back_populates="author",
         cascade="all, delete-orphan",
+        lazy="raise_on_sql"
     )
+
+    @property
+    def image_path(self) -> str:
+        if self.image_file:
+            return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/profile_pics/{self.image_file}"
+        return "/static/profile_pics/defualt.jpg"
 
 
 class UserModel(Base):
@@ -54,16 +85,35 @@ class UserModel(Base):
     username: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    image_file: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+        default=None
+    )
     disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
-    like: Mapped[List["Like"]] = relationship(back_populates="user")
-    comment: Mapped[List["Comment"]] = relationship(back_populates="user")
+    like: Mapped[List["Like"]] = relationship(
+        back_populates="user", 
+        lazy="raise_on_sql"
+    )
+    comment: Mapped[List["Comment"]] = relationship(
+        back_populates="user",
+        lazy="raise_on_sql"
+    )
     reads: Mapped[List["UserReadsBlogs"]] = relationship(
-        back_populates="user"
+        back_populates="user",
+        lazy="raise_on_sql"
     )
     reset_token: Mapped[list["UserPasswordResetToken"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+        lazy="raise_on_sql"
     )
+
+    @property
+    def image_path(self) -> str:
+        if self.image_file:
+            return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/profile_pics/{self.image_file}"
+        return "/static/profile_pics/defualt.jpg"
 
 
 class Blog(Base):
@@ -76,13 +126,26 @@ class Blog(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     author_id: Mapped[int] = mapped_column(ForeignKey("authors.id"))
-    author: Mapped["Author"] = relationship(back_populates="blog")
-    like: Mapped[List["Like"]] = relationship(back_populates="blog")
-    comment: Mapped[List["Comment"]] = relationship(back_populates="blog")
-    readers: Mapped[List["UserReadsBlogs"]] = relationship(
-        back_populates="blog"
+    author: Mapped["Author"] = relationship(
+        back_populates="blog", 
+        lazy="raise_on_sql"
     )
-    status: Mapped[BlogStatus] = mapped_column(Enum(BlogStatus, name="blog_status"), default=BlogStatus.PENDING)
+    like: Mapped[List["Like"]] = relationship(
+        back_populates="blog", 
+        lazy="raise_on_sql"
+    )
+    comment: Mapped[List["Comment"]] = relationship(
+        back_populates="blog", 
+        lazy="raise_on_sql"
+    )
+    readers: Mapped[List["UserReadsBlogs"]] = relationship(
+        back_populates="blog",
+        lazy="raise_on_sql"
+    )
+    status: Mapped[BlogStatus] = mapped_column(
+        Enum(BlogStatus, name="blog_status"), 
+        default=BlogStatus.PENDING
+    )
 
 
 class UserReadsBlogs(Base):
@@ -94,8 +157,14 @@ class UserReadsBlogs(Base):
     blog_id: Mapped[int] = mapped_column(
         ForeignKey("blogs.id"), primary_key=True
     )
-    user: Mapped["UserModel"] = relationship(back_populates="reads")
-    blog: Mapped["Blog"] = relationship(back_populates="readers")
+    user: Mapped["UserModel"] = relationship(
+        back_populates="reads", 
+        lazy="raise_on_sql"
+    )
+    blog: Mapped["Blog"] = relationship(
+        back_populates="readers", 
+        lazy="raise_on_sql"
+    )
 
 
 class Comment(Base):
@@ -106,18 +175,35 @@ class Comment(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    like: Mapped[List["Like"]] = relationship(back_populates="comment")
+    like: Mapped[List["Like"]] = relationship(
+        back_populates="comment",
+        lazy="raise_on_sql"
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    user: Mapped["UserModel"] = relationship(back_populates="comment")
+    user: Mapped["UserModel"] = relationship(
+        back_populates="comment",
+        lazy="raise_on_sql"
+    )
     blog_id: Mapped[int] = mapped_column(ForeignKey("blogs.id"))
-    blog: Mapped["Blog"] = relationship(back_populates="comment")
-    parent_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id"), nullable=True)
+    blog: Mapped["Blog"] = relationship(
+        back_populates="comment", 
+        lazy="raise_on_sql"
+    )
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("comments.id"), 
+        nullable=True
+    )
     parent: Mapped["Comment | None"] = relationship(
         "Comment",
         remote_side=[id],
         back_populates="children",
+        lazy="raise_on_sql"
     )
-    children: Mapped[List["Comment"]] = relationship(back_populates="parent", cascade="all, delete")
+    children: Mapped[List["Comment"]] = relationship(
+        back_populates="parent", 
+        cascade="all, delete", 
+        lazy="raise_on_sql"
+    )
 
 
 class Like(Base):
@@ -125,11 +211,20 @@ class Like(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     comment_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id"))
-    comment: Mapped["Comment"] = relationship(back_populates="like")
+    comment: Mapped["Comment"] = relationship(
+        back_populates="like", 
+        lazy="raise_on_sql"
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    user: Mapped["UserModel"] = relationship(back_populates="like")
+    user: Mapped["UserModel"] = relationship(
+        back_populates="like", 
+        lazy="raise_on_sql"
+    )
     blog_id: Mapped[int | None] = mapped_column(ForeignKey("blogs.id"))
-    blog: Mapped["Blog"] = relationship(back_populates="like")
+    blog: Mapped["Blog"] = relationship(
+        back_populates="like", 
+        lazy="raise_on_sql"
+    )
 
 
 class AdminPasswordResetToken(Base):
@@ -142,7 +237,10 @@ class AdminPasswordResetToken(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     admin_id: Mapped[int] = mapped_column(ForeignKey("admin_user.id"), nullable=False)
-    admin_user: Mapped["AdminUser"] = relationship(back_populates="reset_token")
+    admin_user: Mapped["AdminUser"] = relationship(
+        back_populates="reset_token", 
+        lazy="raise_on_sql"
+    )
 
 
 class AuthorPasswordResetToken(Base):
@@ -155,7 +253,10 @@ class AuthorPasswordResetToken(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     author_id: Mapped[int] = mapped_column(ForeignKey("authors.id"), nullable=False)
-    author: Mapped["Author"] = relationship(back_populates="reset_token")
+    author: Mapped["Author"] = relationship(
+        back_populates="reset_token", 
+        lazy="raise_on_sql"
+    )
 
 
 class UserPasswordResetToken(Base):
@@ -168,4 +269,7 @@ class UserPasswordResetToken(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    user: Mapped["UserModel"] = relationship(back_populates="reset_token")
+    user: Mapped["UserModel"] = relationship(
+        back_populates="reset_token", 
+        lazy="raise_on_sql"
+    )
