@@ -26,6 +26,7 @@ app = FastAPI(lifespan=lifespan)
 base_dir = Path(__file__).resolve().parent.parent
 static_dir = base_dir / "frontend" / "static"
 templates_dir = static_dir / "templates"
+favicon_path = static_dir / "icons" / "favicon.ico"
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -34,7 +35,9 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 async def root() -> FileResponse:
     return FileResponse(templates_dir / "index.html")
 
-
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(favicon_path, media_type="image/x-icon")
 
 @app.get("/{page}.html", response_class=FileResponse)
 async def html_page(page: str) -> FileResponse:
