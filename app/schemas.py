@@ -47,7 +47,7 @@ class UserRead(BaseModel):
 
     id: int
     username: str
-    image_file: str | None
+    image_file: str | None = None
     image_path: str
 
 
