@@ -215,7 +215,7 @@ async def change_password(
     return {"message": "Password changed successfully"}
    
    
-@router.get("/me", response_model=UserSchema)
+@router.get("/me", response_model=UserRead)
 async def read_current_user(current_user: UserSchema = Depends(get_current_active_user)):
     return current_user
 
