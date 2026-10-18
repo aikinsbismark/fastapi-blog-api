@@ -47,17 +47,7 @@ loginForm.addEventListener('submit', async (event) => {
             return;
         }
 
-        authenticate(
-            { user: { 
-                ...(data.user || {}),
-                role: data.user?.role ?? role,
-                token: data.access_token
-             } ,
-            },
-            (user) => {
-                redirectByRole(user?.role ?? role);
-            }
-        );
+        authenticate(data, role, () => redirectByRole(role));
     } catch (error) {
         const msg =
         error?.message || 'Network error. Please check your connection and try again.';
