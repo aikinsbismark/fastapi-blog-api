@@ -1,6 +1,13 @@
 import { config } from '../js/config.js';
 
 
+const meEndpoints = {
+   admin:  `${config.API_BASE_URL}/admin/me`,
+   author: `${config.API_BASE_URL}/author/me`,
+   user: `${config.API_BASE_URL}/user/me`
+};
+
+
 const signupEndpoint = {
    admin:  `${config.API_BASE_URL}/admin/`,
    author: `${config.API_BASE_URL}/author/signup`,
@@ -36,6 +43,13 @@ const resetPasswordEndpoints = {
 };
 
 
+const profilePictureEndpoints = {
+    admin: (id) => `${config.API_BASE_URL}/admin/${id}/picture`,
+    author: (id) => `${config.API_BASE_URL}/author/${id}/picture`,
+    user: (id) => `${config.API_BASE_URL}/user/${id}/picture`
+}
+
+
 export const extractToken = (storedUser) => {
     return storedUser?.access_token ?? storedUser?.token ?? storedUser?.jwt ?? null;
 };
@@ -52,7 +66,7 @@ export const signup = async (user, role) => {
         body: JSON.stringify(user)
     });
 
-    let data = {}
+    let data = {};
 
     try {
         data = await response.json();
@@ -81,7 +95,7 @@ export const login = async (user, role) => {
         body: body.toString()
     });
 
-    let data = {}
+    let data = {};
 
     try {
         data = await response.json();
@@ -189,6 +203,8 @@ export const changePassword = async(token, role, currentPassword, newPassword) =
         })
     });
 
+    let data = {};
+
     try {
         data = await response.json();
     } catch (error) {
@@ -213,7 +229,7 @@ export const forgotPassword = async(email, role) => {
         body: JSON.stringify({ email: email })
     });
 
-    let data = {}
+    let data = {};
 
     try {
         data = await response.json();
@@ -239,6 +255,8 @@ export const resetPassword = async(token, role, newPassword) => {
         body: JSON.stringify({ new_password: newPassword })
     });
 
+    let data = {};
+
     try {
         data = await response.json();
     } catch (error) {
@@ -254,6 +272,88 @@ export const resetPassword = async(token, role, newPassword) => {
 
 
 
+export const updateProfile = async(token, role, { username, email }) => {
+    const url = meEndpoints[role];
+    const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify( { username, email: email })
+    });
+
+    let data = {};
+    
+    try {
+        data = await response.json();
+    } catch (error) {
+        console.error("Unable to parse response.");
+    }
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        data,
+    };
+}
+
+
+export const uploadProfilePicture = async(token, role, userId, file) => {
+    const url = profilePictureEndpoints[role](userId);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+            Authorization: `Bearer ${token}`
+        },
+        body: formData
+    });
+
+    let data = {};
+    
+    try {
+        data = await response.json();
+    } catch (error) {
+        console.error("Unable to parse response.");
+    }
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        data,
+    };
+}
+
+
+export const deleteAccount = async (token, role, userId) => {
+  const url = accountEndpoints[role](userId);
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  let data = {};
+
+  if (response.status !== 204) {
+    try {
+      data = await response.json();
+    } catch (error) {
+      console.error("Unable to parse response.");
+    }
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    data,
+  };
+};
+
 
 export const setLocalStorage = (key, value) => {
     localStorage.setItem(key, JSON.stringify(value));
@@ -263,8 +363,12 @@ export const removeLocalStorage = (key) => {
     localStorage.removeItem(key);
 }
 
-export const authenticate = (data, next) => {
-    setLocalStorage('user', data.user);
+export const authenticate = (data, role, next) => {
+    setLocalStorage('user', {
+        ...data.user,
+        role,
+        access_token: data.access_token ?? data.token,
+    });
     next();
 }
 
