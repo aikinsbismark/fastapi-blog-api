@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-US">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,13 +10,10 @@
     <div class="guard-loading" id="guardLoading">
         <div class="guard-spinner"></div>
     </div>
-
     <div class="app" id="app" style="display: none;">
-
         <aside class="sidebar-brand">
             <span>FastAPI Blog</span>
             <span class="sidebar-tag">Admin</span>
-
             <nav class="sidebar-nav">
                 <a href="#" class="nav-item active" data-view="dashboard">
                     <i data-icon="home"></i> Dashboard
@@ -28,7 +25,6 @@
                     <i data-icon="users"></i> Manage Users
                 </a>
             </nav>
-
             <div class="sidebar-footer">
                 <div class="sidebar-user">
                     <div class="sidebar-avater" id="sidebarAvatar">..</div>
@@ -42,19 +38,16 @@
                 </button>
             </div>
         </aside>
-
         <main class="main">
-
             <section class="view active" id="view-dashboard">
-
                 <header class="topbar">
                     <div>
-                        <h1 class="topbar-title">Welcome back, <span id="welcomeName">—</span>!
-                            <span class="wave">👋</span></h1>
-                        <p class="topbar-sub">Platform overview and what needs your attention.</p>
+                        <h1 class="topbar-title">
+                            Welcome back, <span id="welcomeName">—</span>!
+                            <span class="wave">👋</span>
+                        </h1>
                     </div>
                 </header>
-
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-card-icon stat-card-icon--purple"><i data-icon="users"></i></div>
@@ -77,19 +70,18 @@
                         <div class="stat-card-label">Readers</div>
                     </div>
                 </div>
-
                 <div class="panel">
                     <div class="panel-head">
                         <h2 class="panel-title">Awaiting Your Review</h2>
-                        <a href="#" class="panel-link" data-goto="pending">View all <i data-icon="arrow-right"></i></a>
+                        <a href="#" class="panel-link" data-goto="pending">
+                            View all <i data-icon="arrow-right"></i>
+                        </a>
                     </div>
                     <div class="pending-list" id="recentPendingList">
                         <div class="empty-state">Loading…</div>
                     </div>
                 </div>
-
             </section>
-
             <section class="view" id="view-pending">
                 <header class="topbar">
                     <div>
@@ -104,7 +96,6 @@
                     </div>
                 </div>
             </section>
-
             <section class="view" id="view-users">
                 <header class="topbar">
                     <div>
@@ -112,14 +103,12 @@
                         <p class="topbar-sub">Everyone with an account on the platform.</p>
                     </div>
                 </header>
-
                 <div class="filter-row" id="roleFilterRow">
                     <button class="filter-chip active" data-filter="all">All</button>
                     <button class="filter-chip" data-filter="admin">Admins</button>
                     <button class="filter-chip" data-filter="author">Authors</button>
                     <button class="filter-chip" data-filter="user">Readers</button>
                 </div>
-
                 <div class="panel">
                     <table class="user-table">
                         <thead>
@@ -131,15 +120,17 @@
                             </tr>
                         </thead>
                         <tbody id="userTableBody">
-                            <tr><td colspan="4"><div class="empty-state">Loading…</div></td></tr>
+                            <tr>
+                                <td colspan="4"><div class="empty-state">Loading…</div></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </section>
-
         </main>
     </div>
-da
-    <script type="module" src="/static/js/admin-shboard/components/admin.js"></script>
+
+    <script src="/static/js/ui-controls.js" defer></script>
+    <script type="module" src="/static/js/admin-dashboard/components/admin.js"></script>
 </body>
 </html>
