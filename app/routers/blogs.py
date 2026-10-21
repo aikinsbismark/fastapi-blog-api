@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Query
-from typing import List, Optional, Annotated
+from typing import Optional, Annotated
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
@@ -178,20 +178,21 @@ async def get_current_admin_or_author(
         raise credentials_exception
 
 
-@router.get("/pending", response_model=List[UserReadBlog])
+@router.get("/pending", response_model=list[UserReadBlog])
 async def load_pending_blogs(
     current = Depends(get_current_admin_or_author), 
     db: AsyncSession = Depends(get_db)
 ):
     if current.get("role") == "admin":
-        result = await db.execute(select(Blog).filter(Blog.status == BlogStatus.PENDING))
-        return result.all()
+        result = await db.execute(select(Blog).options(selectinload(Blog.author)).
+                                  filter(Blog.status == BlogStatus.PENDING))
+        return result.scalars().all()
     else:
         author = current.get("user")
         result = await db.execute(select(Blog).filter(
             Blog.status == BlogStatus.PENDING, Blog.author_id == author.id)
         )
-        return result.all()
+        return result.scalars().all()
 
 
 @router.get("/{id}", response_model=BlogInfoSchema)
