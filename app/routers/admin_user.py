@@ -226,7 +226,7 @@ async def change_password(
 @admin_router.get("/users", dependencies=[Depends(get_current_active_admin)])
 async def list_users(db: AsyncSession = Depends(get_db)):
     users = await db.execute(select(UserModel))
-    return users.scalar_one_or_none()
+    return users.scalars().all()
 
 
 @admin_router.delete("/users/{user_id}")
