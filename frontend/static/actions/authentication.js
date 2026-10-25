@@ -372,10 +372,28 @@ export const authenticate = (data, role, next) => {
     next();
 }
 
-export const isAuthenticated = () => {
-    if(localStorage.getItem('user')) {
-        return JSON.parse(localStorage.getItem('user'))
-    } else {
-        return false;
+function tokenExpired(token) {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return payload.exp ? payload.exp * 1000 <= Date.now() : false;
+    } catch {
+        return true;                       
     }
 }
+
+export const isAuthenticated = () => {
+    const raw = localStorage.getItem('user');
+    if (!raw) return false;
+    try {
+        const stored = JSON.parse(raw);
+        const token = stored?.access_token ?? stored?.token;
+        if (!token || tokenExpired(token)) {
+            localStorage.removeItem('user');   
+            return false;
+        }
+        return stored;
+    } catch {
+        localStorage.removeItem('user');
+        return false;
+    }
+};
