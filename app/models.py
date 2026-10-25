@@ -93,15 +93,18 @@ class UserModel(Base):
     disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
     like: Mapped[List["Like"]] = relationship(
         back_populates="user", 
-        lazy="raise_on_sql"
+        lazy="raise_on_sql", 
+        cascade="all, delete-orphan"
     )
     comment: Mapped[List["Comment"]] = relationship(
         back_populates="user",
-        lazy="raise_on_sql"
+        lazy="raise_on_sql", 
+        cascade="all, delete-orphan"
     )
     reads: Mapped[List["UserReadsBlogs"]] = relationship(
         back_populates="user",
-        lazy="raise_on_sql"
+        lazy="raise_on_sql",
+        cascade="all, delete-orphan"
     )
     reset_token: Mapped[list["UserPasswordResetToken"]] = relationship(
         back_populates="user",
