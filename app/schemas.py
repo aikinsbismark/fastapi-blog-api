@@ -34,6 +34,19 @@ class UserSchema(BaseModel):
     disabled: bool | None = None
 
 
+class ManagedUserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    email: EmailStr | None = None
+    disabled: bool | None = None
+    role: str = "user"
+    created_at: datetime | None = None
+    image_path: str | None = None
+    
+
+
 class UserCreate(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
@@ -76,6 +89,14 @@ class AuthorBase(BaseModel):
     username: str
     email: EmailStr
     disabled: bool | None = None
+
+
+class AuthorPublic(BaseModel):
+    model_config = ConfigDict(extra='ignore', from_attributes=True)
+
+    id: int
+    username: str
+    image_path: str | None = None
     
 
 class AuthorCreate(BaseModel):
@@ -111,9 +132,8 @@ class BlogUpdate(BaseModel):
 class CommentCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    user_id: int
     parent_id: int | None = None
-    content: str = Form(...)
+    content: str = Field(min_length=1, max_length=1000)
 
 
 class CommentRead(BaseModel):   
@@ -134,15 +154,18 @@ class UserReadBlog(BaseModel):
     id: int
     title: str
     content: str
-    author: AuthorBase
+    author: AuthorPublic
     likes_count: int = 0
+    comments_count: int = 0
 
 
 class BlogInfoSchema(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
+    id: int
     title: str
     content: str 
+    author: AuthorPublic
 
 
 class LikePost(BaseModel):
