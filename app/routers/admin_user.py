@@ -21,7 +21,8 @@ from ..schemas import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
     UserPrivate,
-    UserUpdate
+    UserUpdate,
+    ManagedUserRead
 )
 from botocore.exceptions import ClientError
 from ..email_utils import send_password_reset_email
@@ -41,7 +42,13 @@ from ..image_utils import (
     process_profile_image,
     upload_profile_image
 )
-from ..models import AdminUser, AdminPasswordResetToken, UserModel
+from ..models import (
+    AdminUser, 
+    AdminPasswordResetToken, 
+    UserModel,
+    Author,
+    Blog
+)
 from .security.admin_authentication import (
     get_current_active_admin
 ) 
@@ -223,10 +230,33 @@ async def change_password(
     return {"message": "Password changed successfully"}
 
 
-@admin_router.get("/users", dependencies=[Depends(get_current_active_admin)])
+@admin_router.get("/users", 
+                  response_model=list[ManagedUserRead],
+                  dependencies=[Depends(get_current_active_admin)]
+)
 async def list_users(db: AsyncSession = Depends(get_db)):
-    users = await db.execute(select(UserModel))
-    return users.scalars().all()
+    users = (await db.execute(select(UserModel))).scalars().all()
+    authors = (await db.execute(select(Author))).scalars().all()
+    admins = (await db.execute(select(AdminUser))).scalars().all()
+
+    def to_row(account, role):
+        return ManagedUserRead(
+            id=account.id,
+            username=account.username,
+            email=account.email,
+            disabled=getattr(account, "disabled", None),
+            role=role,
+            created_at=getattr(account, "created_at", None),
+            image_path=getattr(account, "image_path", None),
+        )
+    
+    rows = (
+        [to_row(u, "user") for u in users]
+        + [to_row(a, "author") for a in authors]
+        + [to_row(a, "admin") for a in admins]
+    )
+    rows.sort(key=lambda r: r.created_at or datetime.min, reverse=True)
+    return rows
 
 
 @admin_router.delete("/users/{user_id}")
@@ -245,6 +275,56 @@ async def delete_user(
     await db.delete(user)
     await db.commit()
     return {"message": "User deleted"}
+
+
+@admin_router.delete("/authors/{author_id}")
+async def delete_author(
+    author_id: int,
+    current_admin = Depends(get_current_active_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Author).where(Author.id == author_id))
+    author = result.scalar_one_or_none()
+    if not author:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Author not found"
+        )
+
+    blog_count = (await db.execute(
+        select(func.count()).select_from(Blog).where(Blog.author_id == author_id)
+    )).scalar() or 0
+    if blog_count:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This author still has {blog_count} blog(s). Delete them first.",
+        )
+
+    await db.delete(author)
+    await db.commit()
+    return {"message": "Author deleted"}
+
+
+@admin_router.delete("/admins/{admin_id}")
+async def delete_admin(
+    admin_id: int,
+    current_admin = Depends(get_current_active_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_id == current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="You can't delete your own account."
+        )
+
+    result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+    admin = result.scalar_one_or_none()
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+
+    await db.delete(admin)
+    await db.commit()
+    return {"message": "Admin deleted"}
 
 
 @admin_router.patch("/{user_id}", response_model=UserPrivate)
