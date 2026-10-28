@@ -10,7 +10,7 @@ export function setUsersToken(sessionToken) {
 
 export async function loadUsers() {
     const response = await fetch(`${config.API_BASE_URL}/admin/users`, {
-        
+
         headers: {
             Authorization: `Bearer ${token}`,
         },
@@ -75,21 +75,28 @@ function getFilteredUsers() {
     return allUsers.filter((user) => user.role === currentRoleFilter);
 }
 
+const DELETE_PATHS = {
+    user: "users",
+    author: "authors",
+    admin: "admins",
+};
+
 function createUserRow(user) {
+    const actions = `
+        <button class="delete-user"
+                data-user-id="${user.id}"
+                data-role="${escapeHtml(user.role)}">Delete</button>
+    `;
+
     return `
         <tr>
             <td>
                 <strong>${escapeHtml(user.username)}</strong><br>
-                <small>${escapeHtml(user.email || user.email_address || "")}</small>
+                <small>${escapeHtml(user.email || "")}</small>
             </td>
             <td>${capitalize(user.role)}</td>
             <td>${formatDate(user.created_at)}</td>
-
-            <td>
-                <button
-                    class="delete-user"
-                    data-user-id="${user.id}">Delete</button>
-            </td>
+            <td>${actions}</td>
         </tr>
     `;
 }
@@ -108,8 +115,9 @@ function attachDeleteEvents() {
     deleteButtons.forEach((button => {
         button.addEventListener("click", async () => {
             const userId = Number(button.dataset.userId);
+            const role = button.dataset.role;
 
-            const confirmed = confirm("Do you want to delete this user?");
+            const confirmed = confirm(`Do you want to delete this ${role}?`);
 
             if (!confirmed) {
                 return;
@@ -119,11 +127,12 @@ function attachDeleteEvents() {
             button.textContent = "Deleting...";
 
             try {
-                await deleteUser(userId);
+                await deleteUser(userId, role);
 
                 await loadUsers(token);
             } catch (error) {
                 console.error(error);
+                alert(error.message);
 
                 button.disabled = false;
                 button.textContent = "Delete";
@@ -132,16 +141,22 @@ function attachDeleteEvents() {
     }));
 }
 
-async function deleteUser(userId) {
-    const response = await fetch(`${config.API_BASE_URL}/admin/users/${userId}`, {
-        method: "DELETE", 
+async function deleteUser(userId, role) {
+    const path = DELETE_PATHS[role];
+    const response = await fetch(`${config.API_BASE_URL}/admin/${path}/${userId}`, {
+        method: "DELETE",
         headers: {
-            Authorization: `Bearer ${token}`, 
-        }, 
+            Authorization: `Bearer ${token}`,
+        },
     });
 
     if (!response.ok) {
-        throw new Error(`Response status: ${response.status}`);
+        let reason = `Response status: ${response.status}`;
+        try {
+            const data = await response.json();
+            if (data.detail) reason = data.detail;
+        } catch {}
+        throw new Error(reason);
     }
 }
 
@@ -154,5 +169,9 @@ function formatDate(date) {
         return "-";
     }
 
-    return new Date(date).toLocaleDateString();
+    return new Date(date).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
 }
