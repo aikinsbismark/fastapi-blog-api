@@ -14,7 +14,7 @@ from ..schemas import(
 from ..config import settings
 from ..enums import BlogStatus
 from ..crud import create_a_blog
-from ..crud import get_comments_by_blog, build_comment_tree
+from ..crud import get_comments_by_blog, build_comment_tree, get_comment_counts
 from ..models import Like
 from ..dependencies import get_db
 from ..models import Blog, Author
@@ -95,6 +95,8 @@ async def get_blogs(
         )
         likes_by_blog = dict(likes_result.all())
 
+    comments_by_blog = await get_comment_counts(db, blog_ids)
+
     blog_entries = [
         UserReadBlog.model_validate({
             "id": blog.id,
@@ -102,6 +104,7 @@ async def get_blogs(
             "content": blog.content,
             "author": blog.author,
             "likes_count": likes_by_blog.get(blog.id, 0),
+            "comments_count": comments_by_blog.get(blog.id, 0),
         })
         for blog in blogs
     ]
@@ -187,18 +190,22 @@ async def load_pending_blogs(
         result = await db.execute(select(Blog).options(selectinload(Blog.author)).
                                   filter(Blog.status == BlogStatus.PENDING))
         return result.scalars().all()
-    else:
-        author = current.get("user")
-        result = await db.execute(select(Blog).filter(
-            Blog.status == BlogStatus.PENDING, Blog.author_id == author.id)
-        )
-        return result.scalars().all()
+    
+    author = current.get("user")
+    result = await db.execute(select(Blog).
+                              options(selectinload(Blog.author)).
+                              filter(
+        Blog.status == BlogStatus.PENDING, Blog.author_id == author.id)
+    )
+    return result.scalars().all()
 
 
 @router.get("/{id}", response_model=BlogInfoSchema)
 async def read_blog(id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Blog).filter(Blog.status==BlogStatus.PUBLISHED).where(Blog.id==id))
+        select(Blog).
+        options(selectinload(Blog.author)).
+        filter(Blog.status==BlogStatus.PUBLISHED).where(Blog.id==id))
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(
