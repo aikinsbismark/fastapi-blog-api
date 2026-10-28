@@ -18,6 +18,9 @@ class AdminUser(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+            DateTime(timezone=True), server_default=func.now()
+    )
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=True)
     disabled: Mapped[bool | None] = mapped_column(default=False, nullable=True)
@@ -84,6 +87,9 @@ class UserModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+            DateTime(timezone=True), server_default=func.now()
+    )
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     image_file: Mapped[str | None] = mapped_column(
         String,
