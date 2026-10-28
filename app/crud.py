@@ -105,6 +105,17 @@ async def get_comments_by_blog(db: AsyncSession, blog_id: int):
     comments = await db.execute(select(Comment).where(Comment.blog_id == blog_id).order_by(Comment.created_at))
     return comments.scalars().all()
 
+async def get_comment_counts(db: AsyncSession, blog_ids: list[int]) -> dict[int, int]:
+    if not blog_ids:
+        return {}
+
+    result = await db.execute(
+        select(Comment.blog_id, func.count(Comment.id))
+        .where(Comment.blog_id.in_(blog_ids))
+        .group_by(Comment.blog_id)
+    )
+    return dict(result.all())
+
 
 def build_comment_tree(comments: list[Comment]):
     nodes: dict[int, dict] = {}
