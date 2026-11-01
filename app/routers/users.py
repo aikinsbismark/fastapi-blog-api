@@ -53,7 +53,7 @@ router = APIRouter(prefix="/user", tags=["users"])
 
 
 
-@router.post("/create_account", response_model=UserRead)
+@router.post("/create_account", response_model=UserPrivate)
 async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existing_user = await get_user_by_username(db, user.username)
     if existing_user:
@@ -179,7 +179,6 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
         )
-    print("Success: All checks passed. Updating password...")
     user.hashed_password = get_password_hash(request_data.new_password)
 
     await db.execute(
@@ -204,7 +203,7 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
-    current_user.password_hash = get_password_hash(password_data.new_password)
+    current_user.hashed_password = get_password_hash(password_data.new_password)
 
     await db.execute(
         sql_delete(UserPasswordResetToken).where(
