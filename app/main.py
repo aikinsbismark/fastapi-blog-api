@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .routers import authors, admin_user, users, blogs, comments, likes
-from .core import Base, engine
+from .core import engine
 from contextlib import asynccontextmanager
 
 
@@ -14,9 +14,8 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
+    await engine.dispose()
 
 
 
