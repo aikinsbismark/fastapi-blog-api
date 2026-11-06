@@ -18,7 +18,7 @@ from ...config import settings
 
 password_hash = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="author/login")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="author/login", scheme_name="AuthorOAuth2")  
 
 
 
@@ -65,7 +65,7 @@ async def get_current_author(
     try:
         payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[settings.ALGORITHM])
         username = payload.get("sub")
-        if not username:
+        if not username or payload.get("role") != "author":
             raise credentials_exception
         token_data = TokenData(username=username)
     except InvalidTokenError:
@@ -74,6 +74,7 @@ async def get_current_author(
     if not author:
         raise credentials_exception
     return author
+
 
 async def get_current_active_author(current_user: AuthorBase = Depends(get_current_author)):
     if current_user.disabled:
