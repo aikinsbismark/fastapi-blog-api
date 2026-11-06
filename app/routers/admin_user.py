@@ -14,7 +14,6 @@ from sqlalchemy import select, func
 from starlette.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from ..schemas import (
-    AdminUserCreate, 
     AdminUserRead, 
     Token,
     ChangePasswordRequest,
@@ -26,7 +25,6 @@ from ..schemas import (
 )
 from botocore.exceptions import ClientError
 from ..email_utils import send_password_reset_email
-from ..crud import create_admin, get_admin_by_name
 from ..dependencies import get_db
 from ..config import settings
 from .security.admin_authentication import (
@@ -40,7 +38,8 @@ from .security.admin_authentication import (
 from ..image_utils import (
     delete_profile_image,
     process_profile_image,
-    upload_profile_image
+    upload_profile_image,
+    read_upload_limited
 )
 from ..models import (
     AdminUser, 
@@ -59,30 +58,6 @@ from .security.admin_authentication import (
 admin_router = APIRouter(prefix="/admin", tags=["admins"])
 
 
-
-@admin_router.post("/", response_model=AdminUserRead)
-async def register_user(admin: AdminUserCreate, db: AsyncSession = Depends(get_db)):
-    existing_user = await get_admin_by_name(db, admin.username)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
-
-    result = await db.execute(
-        select(AdminUser).where(AdminUser.email == admin.email)
-    )
-    existing_email = result.scalar_one_or_none()
-    if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    hashed_password = get_password_hash(admin.password)
-    admin.password = hashed_password
-    admin_create = await create_admin(db, admin)
-    return admin_create
 
 
 @admin_router.post("/login")
@@ -149,6 +124,7 @@ async def forgot_password(
             to_email=admin_email,
             username=admin_username,
             token=token,
+            role="admin",
         )
 
         return {
@@ -401,13 +377,7 @@ async def upload_profile_picture(
             detail="Not authorized to update this user's picture."
         )
 
-    content = await file.read()
-
-    if len(content) > settings.max_upload_size_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size is {settings.max_upload_size_bytes // (1024 * 1024)}MB"
-        )
+    content = await read_upload_limited(file, settings.max_upload_size_bytes)
     
     try:
         processed_bytes, new_filname = await run_in_threadpool(
