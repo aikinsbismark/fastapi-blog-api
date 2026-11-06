@@ -16,7 +16,7 @@ from ...config import settings
 
 password_hash = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/token")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/token", scheme_name="UserOAuth2")  
 
 
 def get_password_hash(plain_password: str) -> str:
@@ -62,7 +62,7 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[settings.ALGORITHM])
         username = payload.get("sub")
-        if not username:
+        if not username or payload.get("role") != "user":
             raise credentials_exception
         token_data = TokenData(username=username)
     except InvalidTokenError:
@@ -71,6 +71,7 @@ async def get_current_user(
     if not user:
         raise credentials_exception
     return user
+
 
 async def get_current_active_user(current_user: UserSchema = Depends(get_current_user)):
     if current_user.disabled:
