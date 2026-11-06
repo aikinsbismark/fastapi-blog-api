@@ -36,14 +36,15 @@ router = APIRouter(prefix="/blog", tags=["blogs"])
 async def create_blog(blog: BlogCreate,
                       current_author: Author = Depends(get_current_active_author),
                       db: AsyncSession = Depends(get_db)):
-    blog = await create_a_blog(db, blog, current_author.id)
-    return blog
+    blog.status = BlogStatus.PENDING
+    return await create_a_blog(db, blog, current_author.id)
 
 
 @router.put("/{blog_id}/publish", status_code=status.HTTP_202_ACCEPTED)
 async def publish_blog(blog_id: int,
                       current_admin = Depends(get_current_active_admin),
-                      db: AsyncSession = Depends(get_db)):
+                      db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(Blog).where(Blog.id == blog_id))
     blog = result.scalar_one_or_none()
     if not blog:
@@ -215,25 +216,47 @@ async def read_blog(id: int, db: AsyncSession = Depends(get_db)):
     return post
 
 
-@router.put("/update/{id}", response_model=BlogCreate)
-async def update_blog(blog: BlogUpdate, id: int, db: AsyncSession = Depends(get_db)):
+@router.put("/update/{id}", response_model=BlogPost)
+async def update_blog(
+    id: int,
+    blog_update: BlogUpdate,
+    current=Depends(get_current_admin_or_author),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Blog).where(Blog.id == id))
     post = result.scalar_one_or_none()
+
     if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog does not exist"
+            detail="Blog does not exist",
         )
-    update_data = blog.model_dump(exclude_unset=True)
-    if not update_data: 
-        pass
-    else:
-        stmt = update(Blog).where(Blog.id == id).values(update_data)
-        db.execute(stmt)
-        await db.commit()
-    result = await db.execute(select(Blog).where(Blog.id == id))
-    updated_post = result.scalar_one_or_none()
-    return updated_post
+
+    role = current["role"]
+    user = current["user"]
+
+    if role == "author" and post.author_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to edit this blog",
+        )
+
+    update_data = blog_update.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields provided to update",
+        )
+
+    for field, value in update_data.items():
+        setattr(post, field, value)
+
+    if role == "author":
+        post.status = BlogStatus.PENDING
+
+    await db.commit()
+    await db.refresh(post)
+    return post
 
 
 @router.delete("/delete/{id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -259,12 +282,11 @@ async def delete_blog_post(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     if role == "author":
-        if getattr(result, 'author_id', None) == getattr(user, 'id', None):
-            await db.delete(result)
-            await db.commit()
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
-        else:
+        if blog.author_id != user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to delete this blog"
+                detail="Not authorized to delete this blog",
             )
+        await db.delete(blog)
+        await db.commit()
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
