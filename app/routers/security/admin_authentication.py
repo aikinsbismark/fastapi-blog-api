@@ -17,7 +17,7 @@ from ...config import settings
 
 password_hash = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin/login")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin/login", scheme_name="AdminOAuth2")  
 
 
 def get_password_hash(plain_password: str) -> str:
@@ -63,7 +63,7 @@ async def get_current_admin(
     try:
         payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[settings.ALGORITHM])
         username = payload.get("sub")
-        if not username:
+        if not username or payload.get("role") != "admin":
             raise credentials_exception
         token_data = TokenData(username=username)
     except InvalidTokenError:
