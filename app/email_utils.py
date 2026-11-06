@@ -1,17 +1,15 @@
 from email.message import EmailMessage
-
 import aiosmtplib
-
 from .config import settings
 
 
 async def send_email(
-        to_email: str, 
-        subject: str,
-        plain_text: str,
-        html_content: str | None = None,
+    to_email: str,
+    subject: str,
+    plain_text: str,
+    html_content: str | None = None,
 ) -> None:
-    message  = EmailMessage()
+    message = EmailMessage()
     message["From"] = settings.mail_from
     message["To"] = to_email
     message["Subject"] = subject
@@ -22,17 +20,25 @@ async def send_email(
         message.add_alternative(html_content, subtype="html")
 
     await aiosmtplib.send(
-        message, 
+        message,
         hostname=settings.mail_server,
         port=settings.mail_port,
         username=settings.mail_username or None,
         password=settings.mail_password.get_secret_value() or None,
-        start_tls=settings.mail_use_tls
+        start_tls=settings.mail_use_tls,
     )
 
 
-async def send_password_reset_email(to_email: str, username: str, token: str) -> None:
-    reset_url = f"{settings.frontend_url}/reset-password?token={token}"
+async def send_password_reset_email(
+    to_email: str,
+    username: str,
+    token: str,
+    role: str,
+) -> None:
+    reset_url = (
+        f"{settings.frontend_url}/reset_password.html"
+        f"?token={token}&role={role}"
+    )
 
     plain_text = f"""Hi {username},
 
