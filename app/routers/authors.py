@@ -36,7 +36,8 @@ from .security.author_authentication import (
 from ..image_utils import (
     delete_profile_image,
     process_profile_image,
-    upload_profile_image
+    upload_profile_image,
+    read_upload_limited
 )
 from .security.author_authentication import get_current_active_author
 from PIL import UnidentifiedImageError
@@ -129,6 +130,7 @@ async def forgot_password(
             to_email=user.email,
             username=user.username,
             token=token,
+            role="author",
         )
 
         return {
@@ -289,13 +291,7 @@ async def upload_profile_picture(
             detail="Not authorized to update this user's picture"
         )
 
-    content = await file.read()
-
-    if len(content) > settings.max_upload_size_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size is {settings.max_upload_size_bytes // (1024 * 1024)}MB"
-        )
+    content = await read_upload_limited(file, settings.max_upload_size_bytes)
 
     try:
         processed_bytes, new_filname = await run_in_threadpool(
