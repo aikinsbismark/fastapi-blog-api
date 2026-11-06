@@ -3,9 +3,36 @@ from io import BytesIO
 
 import boto3
 from PIL import Image, ImageOps
+from fastapi import HTTPException, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 
 from .config import settings
+
+
+
+async def read_upload_limited(
+        upload: UploadFile,
+        max_bytes: int,
+        chunck_size: int = 64 * 1024
+) -> bytes:
+    content = bytearray()
+
+    while True: 
+        remaining = max_bytes - len(content)
+        chunk = await upload.read(min(chunck_size, remaining + 1))
+
+        if not chunk:
+            break
+
+        content.extend(chunk)
+
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="File too large"
+            )
+
+    return bytes(content)
 
 
 def _get_s3_client():
