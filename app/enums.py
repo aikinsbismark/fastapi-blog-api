@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
 
-class BlogStatus(Enum):
+class BlogStatus(StrEnum):
     PENDING = "PENDING"
     PUBLISHED = "PUBLISHED"
