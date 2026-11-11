@@ -25,6 +25,7 @@ from ..schemas import (
 from ..models import Author, AuthorPasswordResetToken
 from ..crud import create_author, get_author_by_name
 from ..dependencies import get_db
+from ..time_utils import is_expired
 from .security.author_authentication import (
     create_access_token, 
     authenticate_author, 
@@ -133,9 +134,9 @@ async def forgot_password(
             role="author",
         )
 
-        return {
-            "message": "If an account exists with this email, you will receive password reset instructions.",
-        }
+    return {
+        "message": "If an account exists with this email, you will receive password reset instructions.",
+    }
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
@@ -158,7 +159,7 @@ async def reset_password(
             detail="Invalid or expired reset token"
         )
 
-    if reset_token.expires_at < datetime.now(UTC).replace(tzinfo=None):
+    if is_expired(reset_token.expires_at):
         await db.delete(reset_token)
         await db.commit()
         raise HTTPException(
