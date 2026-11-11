@@ -1,7 +1,11 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sql_delete, update as sql_update
+from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import AdminUser, UserModel, Author, Blog, Comment, Like
+from .models import (
+    AdminUser, UserModel, Author, Blog, Comment, Like, UserReadsBlogs,
+    AdminPasswordResetToken, AuthorPasswordResetToken, UserPasswordResetToken,
+)
 from .schemas import (
      AdminUserCreate, 
      UserCreate, 
@@ -89,11 +93,20 @@ async def create_comment(
         user_id: int,
         comment: CommentCreate
 ):
+    parent_id = getattr(comment, 'parent_id', None)
+    if parent_id is not None:
+        parent = await db.get(Comment, parent_id)
+        if parent is None or parent.blog_id != blog_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Parent comment not found on this blog",
+            )
+
     new_comment = Comment(
         blog_id=blog_id,
         user_id=user_id,
         content=comment.content,
-        parent_id=getattr(comment, 'parent_id', None),
+        parent_id=parent_id,
     )
 
     db.add(new_comment)
@@ -179,7 +192,7 @@ async def toggle_like(
             detail="Must specify blog_id or comment_id"
         )
 
-    existing_like = result.scalar_one_or_none()
+    existing_like = result.scalars().first()
 
     if existing_like:
         await db.delete(existing_like)
@@ -210,8 +223,20 @@ async def toggle_like(
     )
 
     db.add(new_like)
-    await db.commit()
-    await db.refresh(new_like)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(
+            select(Like).where(
+                Like.user_id == user_id,
+                Like.blog_id == blog_id,
+                Like.comment_id == comment_id,
+            )
+        )
+        new_like = result.scalars().first()
+    else:
+        await db.refresh(new_like)
 
     if blog_id is not None:
         count_query = select(func.count()).select_from(Like).where(
@@ -230,3 +255,60 @@ async def toggle_like(
         "like_id": new_like.id,
         "likes_count": likes_count,
     }
+
+
+async def _comment_subtree_ids(db: AsyncSession, root_ids: list[int]) -> list[int]:
+    seen = set(root_ids)
+    frontier = list(root_ids)
+    while frontier:
+        rows = (await db.execute(
+            select(Comment.id).where(Comment.parent_id.in_(frontier))
+        )).scalars().all()
+        frontier = [r for r in rows if r not in seen]
+        seen.update(frontier)
+    return list(seen)
+
+
+async def _delete_comments_by_ids(db: AsyncSession, ids: list[int]) -> None:
+    if not ids:
+        return
+    await db.execute(sql_delete(Like).where(Like.comment_id.in_(ids)))
+    await db.execute(sql_delete(Comment).where(Comment.id.in_(ids)))
+
+
+async def delete_comment_cascade(db: AsyncSession, comment_id: int) -> None:
+    ids = await _comment_subtree_ids(db, [comment_id])
+    await _delete_comments_by_ids(db, ids)
+
+
+async def delete_blog_cascade(db: AsyncSession, blog_id: int) -> None:
+    comment_ids = (await db.execute(
+        select(Comment.id).where(Comment.blog_id == blog_id)
+    )).scalars().all()
+    await _delete_comments_by_ids(db, list(comment_ids))
+    await db.execute(sql_delete(Like).where(Like.blog_id == blog_id))
+    await db.execute(sql_delete(UserReadsBlogs).where(UserReadsBlogs.blog_id == blog_id))
+    await db.execute(sql_delete(Blog).where(Blog.id == blog_id))
+
+
+async def delete_user_cascade(db: AsyncSession, user_id: int) -> None:
+    own = (await db.execute(
+        select(Comment.id).where(Comment.user_id == user_id)
+    )).scalars().all()
+    ids = await _comment_subtree_ids(db, list(own))
+    await _delete_comments_by_ids(db, ids)
+    await db.execute(sql_delete(Like).where(Like.user_id == user_id))
+    await db.execute(sql_delete(UserReadsBlogs).where(UserReadsBlogs.user_id == user_id))
+    await db.execute(sql_delete(UserPasswordResetToken).where(UserPasswordResetToken.user_id == user_id))
+    await db.execute(sql_delete(UserModel).where(UserModel.id == user_id))
+
+
+async def delete_author_row(db: AsyncSession, author_id: int) -> None:
+    await db.execute(sql_delete(AuthorPasswordResetToken).where(AuthorPasswordResetToken.author_id == author_id))
+    await db.execute(sql_delete(Author).where(Author.id == author_id))
+
+
+async def delete_admin_row(db: AsyncSession, admin_id: int) -> None:
+    await db.execute(sql_update(Author).where(Author.admin_id == admin_id).values(admin_id=None))
+    await db.execute(sql_delete(AdminPasswordResetToken).where(AdminPasswordResetToken.admin_id == admin_id))
+    await db.execute(sql_delete(AdminUser).where(AdminUser.id == admin_id))

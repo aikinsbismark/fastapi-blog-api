@@ -26,6 +26,8 @@ from ..schemas import (
 from botocore.exceptions import ClientError
 from ..email_utils import send_password_reset_email
 from ..dependencies import get_db
+from ..time_utils import is_expired
+from ..crud import delete_user_cascade, delete_author_row, delete_admin_row
 from ..config import settings
 from .security.admin_authentication import (
     authenticate_admin, 
@@ -127,9 +129,9 @@ async def forgot_password(
             role="admin",
         )
 
-        return {
-            "message": "If an account exists with this email, you will receive password reset instructions.",
-        }
+    return {
+        "message": "If an account exists with this email, you will receive password reset instructions.",
+    }
 
 
 @admin_router.post("/reset-password", status_code=status.HTTP_200_OK)
@@ -152,8 +154,7 @@ async def reset_password(
             detail="Invalid or expired reset token"
         )
 
-    if reset_token.expires_at < datetime.now(UTC).replace(tzinfo=None):
-        print("Fail: Token expired according to timestamps")
+    if is_expired(reset_token.expires_at):
         await db.delete(reset_token)
         await db.commit()
         raise HTTPException(
@@ -248,7 +249,7 @@ async def delete_user(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="User not found"
         )
-    await db.delete(user)
+    await delete_user_cascade(db, user.id)
     await db.commit()
     return {"message": "User deleted"}
 
@@ -276,7 +277,7 @@ async def delete_author(
             detail=f"This author still has {blog_count} blog(s). Delete them first.",
         )
 
-    await db.delete(author)
+    await delete_author_row(db, author.id)
     await db.commit()
     return {"message": "Author deleted"}
 
@@ -298,7 +299,7 @@ async def delete_admin(
     if not admin:
         raise HTTPException(status_code=404, detail="Admin not found")
 
-    await db.delete(admin)
+    await delete_admin_row(db, admin.id)
     await db.commit()
     return {"message": "Admin deleted"}
 

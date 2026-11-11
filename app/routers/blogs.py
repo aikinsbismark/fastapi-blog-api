@@ -13,7 +13,7 @@ from ..schemas import(
 )
 from ..config import settings
 from ..enums import BlogStatus
-from ..crud import create_a_blog
+from ..crud import create_a_blog, delete_blog_cascade
 from ..crud import get_comments_by_blog, build_comment_tree, get_comment_counts
 from ..models import Like
 from ..dependencies import get_db
@@ -172,11 +172,21 @@ async def get_current_admin_or_author(
         admin = await get_admin_by_name(db, username=username)
         if not admin:
             raise credentials_exception
+        if getattr(admin, "disabled", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Account is disabled"
+            )
         return {"role": "admin", "user": admin}
     elif role == 'author':
         author = await get_author_by_name(db, username=username)
         if not author:
             raise credentials_exception
+        if getattr(author, "disabled", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Account is disabled"
+            )
         return {"role": "author", "user": author}
     else:
         raise credentials_exception
@@ -277,7 +287,7 @@ async def delete_blog_post(
     user = current.get("user")
 
     if role == "admin":
-        await db.delete(blog)
+        await delete_blog_cascade(db, blog.id)
         await db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -287,6 +297,6 @@ async def delete_blog_post(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to delete this blog",
             )
-        await db.delete(blog)
+        await delete_blog_cascade(db, blog.id)
         await db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)

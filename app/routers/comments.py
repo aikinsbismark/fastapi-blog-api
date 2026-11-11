@@ -11,7 +11,8 @@ from ..crud import (
     get_comments_by_blog, 
     get_admin_by_name, 
     get_user_by_username,
-    build_comment_tree
+    build_comment_tree,
+    delete_comment_cascade
 )
 from ..dependencies import get_db
 from ..config import settings
@@ -115,13 +116,13 @@ async def delete_comment(
     user = current.get("user")
 
     if role == "admin":
-        await db.delete(comment)
+        await delete_comment_cascade(db, comment.id)
         await db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     if role == "user":
         if comment.user_id == getattr(user, 'id', None):
-            await db.delete(comment)
+            await delete_comment_cascade(db, comment.id)
             await db.commit()
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         else:
