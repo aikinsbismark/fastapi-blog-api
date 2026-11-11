@@ -16,7 +16,7 @@ from ...config import settings
 
 password_hash = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/token", scheme_name="UserOAuth2")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login", scheme_name="UserOAuth2")  
 
 
 def get_password_hash(plain_password: str) -> str:
