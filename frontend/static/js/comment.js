@@ -15,6 +15,7 @@ async function initializeComment() {
 
     setupComposerVisibility();
     initComposer();
+    attachListeners(document.getElementById("commentList"));
     await loadComments();
 }
 initializeComment();
@@ -27,7 +28,7 @@ async function loadAuthenticatedUser() {
     }
 
     token = storedSession.access_token || storedSession.token;
-    currentUser = await getCurrenUser(token);
+    currentUser = await getCurrentUser(token);
 }
 
 function setupComposerVisibility() {
@@ -52,7 +53,7 @@ async function loadComments() {
     const commentList = document.getElementById("commentList");
 
     try {
-        commentTree = await apiFetch(`/comments/${blogId}`);
+        commentTree = await apiFetch(`/comment/${blogId}`);
 
         renderCommentList();
     } catch (error) {
@@ -83,8 +84,6 @@ function renderCommentList() {
     commentList.innerHTML = commentTree
         .map((comment) => topLevelCommentHTML(comment))
         .join("");
-
-    attachListeners(commentList);
 }
 
 function flattenReplies(replies, parentUsername, depth) {
@@ -97,9 +96,9 @@ function flattenReplies(replies, parentUsername, depth) {
             replyingToUsername: parentUsername,
         });
 
-        if (Array.isArray(reply.replies) && reply.replies.length > 0) {
+        if (Array.isArray(reply.children) && reply.children.length > 0) {
             flat = flat.concat(
-                flattenReplies(reply.replies, reply.username, depth + 1)
+                flattenReplies(reply.children, reply.username, depth + 1)
             );
         }
     }
@@ -112,7 +111,7 @@ function flattenReplies(replies, parentUsername, depth) {
 }
 
 function topLevelCommentHTML(comment) {
-    const flatReplies = flattenReplies(comment.replies, comment.username, 0);
+    const flatReplies = flattenReplies(comment.children, comment.username, 0);
     const hasReplies = flatReplies.length > 0;
     const isCurrentUsersComment =
         currentUser && comment.user_id === currentUser.id;
@@ -317,7 +316,7 @@ async function submitTopLevelComment() {
     sendButton.disabled = true;
 
     try {
-        await apiFetch(`/comments/${blogId}`, {
+        await apiFetch(`/comment/${blogId}`, {
             method: "POST",
             body: JSON.stringify({
                 content: commentText,
@@ -343,9 +342,7 @@ function openReplyBox(topId, mentionUsername) {
         closeReplyBox(openReplySlotId);
     }
 
-    const replySlot = document.querySelector(
-        `[data-reply-slot="${topId}"]`
-    );
+    const replySlot = document.querySelector(`[data-reply-slot="${topId}"]`);
 
     if (!replySlot) {
         return;
@@ -457,7 +454,7 @@ async function submitReply(topId, replyText) {
     }
 
     try {
-        await apiFetch(`/comments/${blogId}`, {
+        await apiFetch(`/comment/${blogId}`, {
             method: "POST",
             body: JSON.stringify({
                 content: replyText,
@@ -507,7 +504,7 @@ async function deleteComment(commentId) {
     }
 
     try {
-        await apiFetch(`/comments/${commentId}`, {
+        await apiFetch(`/comment/${commentId}`, {
             method: "DELETE",
         });
 
@@ -606,11 +603,12 @@ function formatDateTime(dateString) {
 }
 
 function escapeHtml(value) {
-    const element = document.createElement("div");
-
-    element.textContent = value ?? "";
-
-    return element.innerHTML;
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 const TOAST_DURATION = 2800;
