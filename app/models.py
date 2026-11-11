@@ -3,7 +3,15 @@ from __future__ import annotations
 from typing import List
 
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, DateTime, Enum, Boolean
+from sqlalchemy import (
+    String, 
+    ForeignKey, 
+    DateTime, 
+    Enum, 
+    Boolean,
+    UniqueConstraint,
+    CheckConstraint
+)
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .enums import BlogStatus
@@ -217,6 +225,15 @@ class Comment(Base):
 
 class Like(Base):
     __tablename__ = "likes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "blog_id", name="uq_likes_user_blog"),
+        UniqueConstraint("user_id", "comment_id", name="uq_likes_user_comment"),
+        CheckConstraint(
+            "(blog_id IS NOT NULL AND comment_id IS NULL) "
+            "OR (blog_id IS NOT NULL AND comment_id IS NOT NULL)",
+            name="ck_likes_exactly_one_target",
+        )
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     comment_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id"))
