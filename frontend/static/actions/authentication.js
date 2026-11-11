@@ -9,16 +9,16 @@ const meEndpoints = {
 
 
 const signupEndpoint = {
-   admin:  `${config.API_BASE_URL}/admin/`,
+   admin:  null,
    author: `${config.API_BASE_URL}/author/signup`,
-   user: `${config.API_BASE_URL}/user/create_account`
+   user: `${config.API_BASE_URL}/user/signup`
 };
 
 
 const loginEndpoints = {
     admin: `${config.API_BASE_URL}/admin/login`,
     author: `${config.API_BASE_URL}/author/login`,
-    user: `${config.API_BASE_URL}/user/token`
+    user: `${config.API_BASE_URL}/user/login`
 };
 
 
@@ -245,21 +245,27 @@ export const forgotPassword = async(email, role) => {
 };
 
 
-export const resetPassword = async(token, role, newPassword) => {
-    const url = resetPasswordEndPoints[role];
+export const resetPassword = async (token, role, newPassword) => {
+    const url = resetPasswordEndpoints[role];
+    if (!url) {
+        throw new Error("Invalid account type.");
+    }
+
     const response = await fetch(url, {
-        method: 'PUT',
+        method: "POST",
         headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
         },
-        body: JSON.stringify({ new_password: newPassword })
+        body: JSON.stringify({
+            token,
+            new_password: newPassword,
+        }),
     });
 
     let data = {};
-
     try {
         data = await response.json();
-    } catch (error) {
+    } catch {
         console.error("Unable to parse response.");
     }
 
@@ -269,7 +275,6 @@ export const resetPassword = async(token, role, newPassword) => {
         data,
     };
 };
-
 
 
 export const updateProfile = async(token, role, { username, email }) => {
