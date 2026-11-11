@@ -33,6 +33,7 @@ from PIL import UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 from ..crud import create_user, get_user_by_username
 from ..dependencies import get_db
+from ..time_utils import is_expired
 from ..email_utils import send_password_reset_email
 from .security.user_authentication import (
     create_access_token, 
@@ -54,8 +55,8 @@ router = APIRouter(prefix="/user", tags=["users"])
 
 
 
-@router.post("/create_account", response_model=UserPrivate)
-async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
+@router.post("/signup", response_model=UserPrivate)
+async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existing_user = await get_user_by_username(db, user.username)
     if existing_user:
         raise HTTPException(
@@ -78,9 +79,7 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
     return user_create
 
     
-
-
-@router.post("/token")
+@router.post("/login")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), 
     db: AsyncSession = Depends(get_db)
@@ -138,9 +137,9 @@ async def forgot_password(
             role="user",
         )
 
-        return {
-            "message": "If an account exists with this email, you will receive password reset instructions.",
-        }
+    return {
+        "message": "If an account exists with this email, you will receive password reset instructions.",
+    }
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
@@ -163,7 +162,7 @@ async def reset_password(
             detail="Invalid or expired reset token"
         )
 
-    if reset_token.expires_at < datetime.now(UTC).replace(tzinfo=None):
+    if is_expired(reset_token.expires_at):
         await db.delete(reset_token)
         await db.commit()
         raise HTTPException(
