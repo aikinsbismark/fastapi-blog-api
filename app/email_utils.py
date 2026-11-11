@@ -1,4 +1,6 @@
 from email.message import EmailMessage
+from html import escape
+from urllib.parse import quote
 import aiosmtplib
 from .config import settings
 
@@ -37,8 +39,11 @@ async def send_password_reset_email(
 ) -> None:
     reset_url = (
         f"{settings.frontend_url}/reset_password.html"
-        f"?token={token}&role={role}"
+        f"?token={quote(token)}&role={quote(role)}"
     )
+    safe_username = escape(username)
+    minutes = settings.reset_token_expire_minutes
+    expiry_text = f"{minutes} minutes" if minutes != 60 else "1 hour"
 
     plain_text = f"""Hi {username},
 
@@ -46,7 +51,7 @@ You requested to reset your password. Click the link below to set a new password
 
 {reset_url}
 
-This link will expire in 1 hour.
+This link will expire in {expiry_text}.
 
 If you didn't request this, you can safely ignore this email.
 
@@ -57,19 +62,19 @@ The FastAPI Blog Team
     html_content = f"""
     <html>
       <body style="font-family: sans-serif; color: #333;">
-        <p>Hi {username},</p>
+        <p>Hi {safe_username},</p>
         <p>You requested to reset your password. Click the button below to set a new password:</p>
         <p>
-          <a href="{reset_url}"
+          <a href="{escape(reset_url)}"
              style="display:inline-block; padding:12px 24px; background:#7469ed;
                     color:#fff; text-decoration:none; border-radius:8px;">
             Reset Password
           </a>
         </p>
         <p>Or copy and paste this link into your browser:<br>
-          <a href="{reset_url}">{reset_url}</a>
+          <a href="{escape(reset_url)}">{escape(reset_url)}</a>
         </p>
-        <p>This link will expire in 1 hour.</p>
+        <p>This link will expire in {expiry_text}.</p>
         <p>If you didn't request this, you can safely ignore this email.</p>
         <p>Best regards,<br>The FastAPI Blog Team</p>
       </body>
