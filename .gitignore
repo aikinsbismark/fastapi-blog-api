@@ -18,3 +18,4 @@ venv/
 /.cache/
 
 .env
+*.backup
