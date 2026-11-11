@@ -9,7 +9,7 @@ class AdminUserCreate(BaseModel):
 
     username: str
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=128)
 
 
 class AdminSchema(BaseModel):
@@ -51,7 +51,7 @@ class UserCreate(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
     username: str
-    password: str 
+    password: str = Field(min_length=8, max_length=128)
     email: EmailStr
 
 
@@ -104,14 +104,14 @@ class AuthorCreate(BaseModel):
 
     username: str
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=128)
 
 
 class BlogCreate(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
-    title: str
-    content: str
+    title: str = Field(min_length=1, max_length=100)
+    content: str = Field(min_length=1, max_length=20000)
     status: BlogStatus = BlogStatus.PENDING
 
         
