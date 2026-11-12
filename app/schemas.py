@@ -1,5 +1,5 @@
 from fastapi import Form
-from pydantic import BaseModel, ConfigDict, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
 from datetime import datetime
 from .models import BlogStatus
 
@@ -10,6 +10,14 @@ class AdminUserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def strip_username(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("username cannot be empty")
+        return v
 
 
 class AdminSchema(BaseModel):
@@ -54,6 +62,14 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     email: EmailStr
 
+    @field_validator("username")
+    @classmethod
+    def strip_username(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("username cannot be empty")
+        return v
+
 
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -71,6 +87,16 @@ class UserPrivate(UserRead):
 class UserUpdate(BaseModel):
     username: str | None = Field(default=None, min_length=1, max_length=50)
     email: EmailStr | None = Field(default=None, max_length=120)
+
+    @field_validator("username")
+    @classmethod
+    def strip_username(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("Username cannot be empty")
+        return v
 
 
 class Token(BaseModel):
@@ -105,6 +131,14 @@ class AuthorCreate(BaseModel):
     username: str
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def strip_username(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("username cannot be empty")
+        return v
 
 
 class BlogCreate(BaseModel):
